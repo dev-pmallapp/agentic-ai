@@ -28,10 +28,23 @@ to drive.
 
 {agent_description}
 
+Skills: {skill_list}
 Workflows: {workflow_list}
 Full instructions: {agent_path}
 Tier: {tier}
 ```
+
+Because Cline loads every rules file into context unconditionally, a
+wasted line here is not cosmetic — it is context spent on every
+request, for every installed agent. So when a kind is empty, its line
+is dropped entirely rather than kept as `Skills:` or `Workflows:` with
+nothing after it: `stock-screening` has Skills and no Workflows, so
+its pointer keeps the `Skills:` line and drops `Workflows:` outright.
+Only when an agent has neither kind does the pointer fall back to a
+single `(none)` line, so a reader isn't left wondering whether
+generation silently dropped both. This rendering convention matches
+`cli.list_cmd` exactly, so a change to one should prompt a change to
+the other.
 
 ## Multi-agent behavior
 

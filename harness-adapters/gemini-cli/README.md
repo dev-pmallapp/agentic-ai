@@ -41,12 +41,23 @@ are exact:
 
 {agent_description}
 
+- Skills: {skill_list}
 - Workflows: {workflow_list}
 - Full instructions: {agent_path}
 - Tier: {tier}
 
 <!-- END ai-agents -->
 ```
+
+An entry's `- Skills:` and `- Workflows:` bullets are independent, and
+either is dropped when its kind is empty rather than kept with nothing
+after the colon: `stock-screening` renders a `- Skills:` bullet and no
+`- Workflows:` bullet at all, `dev-lifecycle` renders both. Only when
+an agent has neither kind does the entry fall back to a single
+`- (none)` bullet in place of both. This rendering convention matches
+`cli.list_cmd` exactly — skills and workflows each get their own line,
+omitted when empty, with a single `(none)` fallback only when both are
+empty — so a change to one should prompt a change to the other.
 
 ## Multi-agent behavior
 
