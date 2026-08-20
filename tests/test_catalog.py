@@ -27,10 +27,23 @@ def test_stock_screening_has_both_skills_and_no_workflows():
     assert screening["description"]
 
 
-def test_dev_lifecycle_is_a_placeholder_with_no_workflows():
+def test_dev_lifecycle_has_the_ported_skills_and_workflow():
+    # Story #9 replaced the placeholder with a real port of six Skills and
+    # one Workflow (autodev) — see agents/dev-lifecycle/AGENT.md "What's
+    # Ported and What Isn't" for what remains deferred.
     agents = {a["name"]: a for a in catalog.list_agents(REPO_ROOT)}
+    dev_lifecycle = agents["dev-lifecycle"]
 
-    assert agents["dev-lifecycle"]["workflows"] == []
+    assert set(dev_lifecycle["skills"]) == {
+        "story-create",
+        "story-design",
+        "task-create",
+        "task-implement",
+        "task-test",
+        "story-test",
+    }
+    assert dev_lifecycle["workflows"] == ["autodev"]
+    assert catalog.find_dangling_skill_refs(dev_lifecycle) == []
 
 
 def test_missing_agents_dir_is_empty_not_an_error(tmp_path):
