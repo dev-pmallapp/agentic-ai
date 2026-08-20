@@ -54,8 +54,21 @@ def list_cmd() -> None:
         click.echo(f"  {agent['name']}")
         if agent["description"]:
             click.echo(f"    {agent['description']}")
-        workflows = ", ".join(agent["workflows"]) or "(none)"
-        click.echo(f"    workflows: {workflows}")
+        skills = agent["skills"]
+        workflows = agent["workflows"]
+        if not skills and not workflows:
+            # Neither kind present: keep the old single-line "(none)"
+            # signal rather than printing two empty "(none)" lines.
+            click.echo("    workflows: (none)")
+        else:
+            # Skills and workflows each get their own line, but an empty one
+            # is omitted entirely rather than printed as "(none)" — an agent
+            # with only workflows (or only skills) should not show a
+            # spurious empty line for the kind it doesn't have.
+            if skills:
+                click.echo(f"    skills: {', '.join(skills)}")
+            if workflows:
+                click.echo(f"    workflows: {', '.join(workflows)}")
         click.echo()
 
 
