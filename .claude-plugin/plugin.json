@@ -1,0 +1,20 @@
+{
+  "name": "ai-agents",
+  "version": "0.1.0",
+  "description": "A portable, cross-harness catalog of agents that bundle their own workflows, installable at user, workspace, or project level",
+  "author": {
+    "name": "ai-agents"
+  },
+  "keywords": [
+    "agents",
+    "workflows",
+    "agent-catalog",
+    "cross-harness",
+    "multi-level-install",
+    "claude-code",
+    "cline",
+    "gemini-cli",
+    "qwen-code"
+  ],
+  "license": "MIT"
+}
