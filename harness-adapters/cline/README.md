@@ -61,5 +61,7 @@ Cline loading every file under `.clinerules/` into context — and not
 from a live install of Cline against a generated pointer. Unverified
 against a live install.
 
-Status: format specified; generation not yet implemented. See
-`install.generate_harness_adapters`.
+Status: format specified and generated. See
+`install.generate_harness_adapters`; this harness is detected by the
+presence of a `.clinerules/` directory and is written one file per
+agent.

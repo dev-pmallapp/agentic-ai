@@ -75,5 +75,7 @@ This format is derived from the discovery mechanism described above —
 from the Gemini CLI fork it mirrors — and not from a live install of
 Qwen Code against a generated block. Unverified against a live install.
 
-Status: format specified; generation not yet implemented. See
-`install.generate_harness_adapters`.
+Status: format specified and generated. See
+`install.generate_harness_adapters`; this harness is detected by a
+`.qwen/` directory or an existing `QWEN.md`, and only the span between
+the two markers is ever rewritten.
