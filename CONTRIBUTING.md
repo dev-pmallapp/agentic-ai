@@ -35,6 +35,16 @@ workflow listed but missing (or present but unlisted) still appears —
 but the routing table is what a harness actually reads, and only you
 can write that.
 
+## Commands
+
+| Action | Command |
+|---|---|
+| build | pip install -e . |
+| test | pytest -q |
+
+Table shape is fixed — it is parsed mechanically by GitHub-workflow
+tooling to resolve build and test commands. Add rows, keep the columns.
+
 ## Tests
 
 The Python package is tested with `pytest`:

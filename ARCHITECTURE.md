@@ -155,6 +155,28 @@ ai-agents/
   pyproject.toml
 ```
 
+## Build Targets
+
+<!--
+  This repo is mostly markdown with one small Python package. The rows
+  below are the logical units a change lands in — what issue-tracker
+  tooling needs to draw task boundaries. Type is `docs` for the
+  markdown units; unknown types are treated as `library` for sizing.
+-->
+
+| Target | Type | Build file | Source dirs |
+|---|---|---|---|
+| ai_agents | library | pyproject.toml | src/ai_agents |
+| tests | tests | pyproject.toml | tests |
+| agents | docs | — | agents |
+| harness-adapters | docs | — | harness-adapters |
+| project-docs | docs | — | docs, README.md, ARCHITECTURE.md, CONTRIBUTING.md |
+
+One build target is one task. A change to the Python package and a
+change to the agent catalog are separate tasks even when they ship the
+same feature; a change touching three files inside `src/ai_agents` is
+one.
+
 ## What This Scaffold Does NOT Do Yet
 
 Stated plainly so the scope is not overread:
