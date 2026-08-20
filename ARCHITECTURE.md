@@ -17,11 +17,12 @@ CLI's entire job is copying and pointing.
 │                    what this is, how it is shaped, how   │
 │                    to add to it                          │
 ├──────────────────────────────────────────────────────────┤
-│ agents/<name>/     the unit of distribution.             │
-│   AGENT.md           persona + routing table             │
-│   workflows/*.md     the actual procedures               │
-│   references/*.md    shared contracts, loaded on demand  │
-│   tools/*            scripts an agent shells out to      │
+│ agents/<Name>/     the unit of distribution.             │
+│   AGENT.md           persona + routing table, both kinds │
+│   Skills/*.md        atomic, individually invocable      │
+│   Workflows/*.md     cumulative, compose Skills          │
+│   References/*.md    shared contracts, cited by both     │
+│   Tools/*            scripts an agent shells out to      │
 ├──────────────────────────────────────────────────────────┤
 │ harness-adapters/  one dir per harness. How that harness │
 │                    discovers instructions, and what its  │
@@ -39,7 +40,7 @@ CLI's entire job is copying and pointing.
 **An agent is a self-contained directory. The CLI only copies it
 between tiers and writes thin pointer files.**
 
-Everything inside `agents/<name>/` is harness-neutral markdown. It says
+Everything inside `agents/<Name>/` is harness-neutral markdown. It says
 nothing about Claude Code, Cline, Gemini CLI, or Qwen Code. The four
 harnesses differ in *how they discover instructions* — not in what good
 instructions say — so that difference is pushed entirely to the edge,
@@ -53,12 +54,42 @@ than one new adapter. Instead:
 
 | Concern | Lives in |
 |---|---|
-| What an agent does | `agents/<name>/AGENT.md` and `workflows/*.md`, once |
+| What an agent does | `agents/<Name>/AGENT.md`, `Skills/*.md`, and `Workflows/*.md`, once |
 | How a harness finds it | `harness-adapters/<harness>/`, one pointer generator |
 | Which copy a project uses | `src/ai_agents/tiers.py`, one resolution order |
 
 A pointer file is never a copy of an agent's content. That rule is what
 keeps "one authoritative copy per tier" true.
+
+## Skills and Workflows
+
+`agents/<Name>/` holds two kinds of procedure, not one.
+
+A **Skill** (`Skills/*.md`) does one thing end to end and is
+individually invocable — a harness can run it on its own, with nothing
+else loaded first. A **Workflow** (`Workflows/*.md`) is cumulative: it
+sequences Skills toward a larger outcome and owns any human approval
+gates along the way. `References/*.md` and `Tools/*` are shared by both
+kinds; neither owns them.
+
+The composition rule runs one direction only: a Workflow may compose
+Skills; a Skill never depends on a Workflow. `AGENT.md`'s routing table
+points to both kinds directly, but nothing under `Skills/` is allowed to
+assume a `Workflows/` file already ran.
+
+That rule buys a specific guarantee: every step of a cumulative run
+stays directly invocable on its own. If a workflow stalls partway
+through — a gate rejected, a harness died, a human wants to re-run one
+step by hand — the Skill it was on is still callable in isolation,
+because the Skill was never written to depend on the workflow's state.
+
+This is why the split is a directory, not a naming convention. One
+`workflows/` directory holding both atomic and cumulative files would
+still let an author write a "skill" that quietly reaches back into a
+workflow's context, and nothing would catch it. Two directories make the
+dependency direction structural: a file under `Skills/` importing
+something from `Workflows/` is a visible layering violation, not a lapse
+in discipline.
 
 ## Multi-level Install
 
@@ -105,16 +136,28 @@ Most future agents here will be ported from LifeOS's skill catalog
 (`/home/pmallapp/tmp/LifeOS/LifeOS/install/skills/`, roughly fifty
 skills). That catalog is the primary source, and the agent anatomy in
 this repo is deliberately LifeOS's skill anatomy: one directory, a
-top-level file carrying persona and a routing table, procedures in
-subdirectory markdown files, shared contracts in a references
-directory.
+top-level file carrying persona and a routing table, atomic procedures
+and cumulative ones each in their own subdirectory, shared contracts in
+a references directory.
 
-The vocabulary is renamed — `AGENT.md` rather than `SKILL.md`,
-lowercase `workflows/` / `references/` / `tools/` rather than LifeOS's
-capitalized `Workflows/` / `References/`. This is a stylistic choice,
-not a technical one: it keeps a file open in an editor unambiguous
-about which project it belongs to, and it keeps a future port honest
-about being a port rather than a copy.
+Subdirectory names now match LifeOS's exactly: `Skills/`, `Workflows/`,
+`References/`, `Tools/`, capitalized the way LifeOS capitalizes them.
+Porting a skill is meant to be close to mechanical — copy the directory,
+strip what doesn't apply, done — and a renamed vocabulary turned every
+port into a rename pass on top of that. An earlier version of this repo
+lowercased these names on the reasoning that it kept a file unambiguous
+about which project it came from; that reasoning is superseded now that
+port fidelity has turned out to matter more than at-a-glance provenance.
+
+`AGENT.md` is the one deliberate exception — it does not become
+`SKILL.md`. A container that holds a `Skills/` directory cannot itself
+be called a skill without reading as a skill nested inside a skill, so
+the container keeps its own name.
+
+Two things are dropped in the port, on every agent, not case by case.
+LifeOS skills open with a `curl` to a local voice daemon on port 31337;
+that call is stripped, so nothing here talks to a voice notifier. And
+`Tools/` here is Python; LifeOS's equivalent is TypeScript.
 
 The one domain LifeOS has no equivalent for is a GitHub-native
 issue/PR-driven development lifecycle. For that, and only that, the
@@ -137,10 +180,11 @@ ai-agents/
   agents/
     stock-screening/
       AGENT.md
-      workflows/swing-trading.md
-      workflows/day-trading-shortlist.md
-      references/                 (empty)
-      tools/                      (empty)
+      Skills/                      (empty)
+      Workflows/swing-trading.md
+      Workflows/day-trading-shortlist.md
+      References/                 (empty)
+      Tools/                      (empty)
     dev-lifecycle/
       AGENT.md                    placeholder only
   harness-adapters/
@@ -184,9 +228,9 @@ Stated plainly so the scope is not overread:
 - **No harness adapter is wired.** All four `harness-adapters/*/README.md`
   describe a contract; none generates anything.
   `install.generate_harness_adapters` raises `NotImplementedError`.
-- **No agent workflow is authored.** Both `stock-screening` workflows
-  are `## TODO` outlines naming what a real implementation needs. They
-  contain no screening logic.
+- **No agent workflow is authored.** Both `stock-screening`
+  `Workflows/*.md` files are `## TODO` outlines naming what a real
+  implementation needs. They contain no screening logic.
 - **No market-data integration exists.** No API, no MCP server, no
   dataset, and no decision about which to use.
 - **Nothing is ported from LifeOS or Forge.** `agents/dev-lifecycle/`
