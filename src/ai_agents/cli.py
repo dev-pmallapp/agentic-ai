@@ -119,7 +119,20 @@ def install_cmd(name: str, tier: str) -> None:
     else:
         click.echo(f"{name} already present at {dst_root / 'agents' / name} (not overwritten)")
 
-    click.echo("Harness pointer files are not generated yet — see harness-adapters/.")
+    # Pointers are regenerated even when the copy was a no-op: the agent may
+    # be present from an earlier install whose harness had not been set up
+    # yet, and regenerating an unchanged pointer costs nothing.
+    results = install.generate_harness_adapters(name, dst_root, tier=tier)
+
+    if not results:
+        click.echo("No supported harness detected here — no pointer files written.")
+        return
+
+    click.echo("\nHarness pointers:")
+    for result in results:
+        click.echo(f"  {result['harness']:<12} {result['action']:<10} {result['path']}")
+        if result["reason"]:
+            click.echo(f"    left alone: {result['reason']}")
 
 
 @cli.command()

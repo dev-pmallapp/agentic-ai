@@ -73,5 +73,7 @@ This format is derived from the discovery mechanism described above —
 also hand-edit — and not from a live install of Gemini CLI against a
 generated block. Unverified against a live install.
 
-Status: format specified; generation not yet implemented. See
-`install.generate_harness_adapters`.
+Status: format specified and generated. See
+`install.generate_harness_adapters`; this harness is detected by a
+`.gemini/` directory or an existing `GEMINI.md`, and only the span
+between the two markers is ever rewritten.
