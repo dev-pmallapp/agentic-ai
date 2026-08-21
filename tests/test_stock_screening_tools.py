@@ -485,6 +485,8 @@ SWING_CRITERIA = {
     "min_delivery_pct": 45.0, "delivery_window": 5,
     "weight_trend": 0.35, "weight_volume": 0.20,
     "weight_volatility": 0.20, "weight_delivery": 0.25,
+    "signal_breakout_window": 5, "signal_cross_lookback": 3,
+    "signal_pullback_pct": 3.0, "signal_extended_pct": 12.0,
     "shortlist_size": 25,
 }
 
@@ -914,3 +916,135 @@ def test_user_agent_is_sent_on_every_request():
     # no status code, no body. This is the single easiest way to break
     # the fetcher.
     assert "Mozilla" in bhavcopy.USER_AGENT
+
+
+# --------------------------------------------------------------------------
+# signals
+# --------------------------------------------------------------------------
+#
+# Signals classify names that have already passed every filter. The
+# invariant that matters most is at the bottom: they must not move the
+# passing set or its ordering. See References/swing-criteria.md § Signals.
+
+
+def test_breakout_is_a_close_at_the_top_of_its_window():
+    closes = [100.0, 102.0, 104.0, 106.0, 108.0, 110.0]
+
+    signals = screen.swing_signals(closes, short=108.0, criteria=SWING_CRITERIA)
+
+    assert "breakout" in signals
+
+
+def test_no_breakout_when_a_prior_close_was_higher():
+    closes = [100.0, 120.0, 104.0, 106.0, 108.0, 110.0]
+
+    signals = screen.swing_signals(closes, short=108.0, criteria=SWING_CRITERIA)
+
+    assert "breakout" not in signals
+
+
+def test_cross_is_read_from_history_not_the_current_stack():
+    # Every name reaching here already has close > short > long, so the
+    # question is how recently that became true. This series has the
+    # stack completing two sessions ago, inside the lookback.
+    closes = [120.0, 118.0, 116.0, 114.0, 112.0, 110.0, 112.0, 116.0, 122.0, 130.0]
+
+    signals = screen.swing_signals(closes, short=122.67, criteria=SWING_CRITERIA)
+
+    assert "cross" in signals
+
+
+def test_no_cross_when_the_trend_is_already_mature():
+    closes = [100.0 + i * 5 for i in range(12)]
+
+    signals = screen.swing_signals(closes, short=155.0, criteria=SWING_CRITERIA)
+
+    assert "cross" not in signals
+
+
+def test_pullback_is_a_close_near_the_short_average():
+    closes = [100.0, 102.0, 104.0, 106.0, 108.0, 110.0, 111.0, 111.5]
+
+    signals = screen.swing_signals(closes, short=110.83, criteria=SWING_CRITERIA)
+
+    assert "pullback" in signals
+    assert "extended" not in signals
+
+
+def test_extended_is_a_close_far_above_the_short_average():
+    closes = [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 120.0, 140.0]
+
+    signals = screen.swing_signals(closes, short=121.67, criteria=SWING_CRITERIA)
+
+    assert "extended" in signals
+    assert "pullback" not in signals
+
+
+def test_pullback_and_extended_are_mutually_exclusive():
+    # Opposite ends of one measurement. Both appearing would mean the
+    # bands overlap, which the criteria file forbids.
+    for short in (100.0, 105.0, 110.0, 120.0):
+        signals = screen.swing_signals([90.0, 95.0, 111.0], short, SWING_CRITERIA)
+        assert not ("pullback" in signals and "extended" in signals)
+
+
+def test_a_name_may_carry_more_than_one_signal():
+    closes = [120.0, 118.0, 116.0, 114.0, 112.0, 110.0, 112.0, 116.0, 122.0, 130.0]
+
+    signals = screen.swing_signals(closes, short=122.67, criteria=SWING_CRITERIA)
+
+    assert "cross" in signals and "breakout" in signals
+
+
+def test_no_signal_is_a_normal_result():
+    # A stock quietly holding its trend: well below an earlier high, no
+    # cross inside the lookback, and sitting between the pullback and
+    # extended bands at 5.4% above the short average.
+    closes = [100.0, 200.0, 150.0, 152.0, 154.0, 156.0]
+
+    signals = screen.swing_signals(closes, short=148.0, criteria=SWING_CRITERIA)
+
+    assert signals == []
+
+
+def test_signals_are_computed_onto_every_candidate():
+    # Asserts the *content*, not merely that the key exists and holds a
+    # list — an empty list would satisfy that while the wiring was gone.
+    # This uptrend closes at the top of its window and is 3.85% above the
+    # short average, so it breaks out and is neither pulled back nor
+    # extended.
+    sessions = sessions_from({"a": _uptrend()})
+
+    result = screen.screen_swing(sessions, SWING_CRITERIA, UNIVERSE_DEFAULTS)
+
+    assert result["candidates"][0]["signals"] == ["breakout"]
+
+
+def test_signal_parameters_never_move_the_passing_set():
+    """The invariant: signals classify, they do not select.
+
+    Changing every signal threshold to something absurd must leave the
+    same names in the same order carrying the same scores. If this test
+    fails, a signal has become a filter.
+    """
+    sessions = sessions_from({
+        "a": _uptrend(),
+        "b": [bar(100.0 + i * 5, isin="INE000A01002", symbol="OTHERCO") for i in range(8)],
+    })
+
+    baseline = screen.screen_swing(sessions, SWING_CRITERIA, UNIVERSE_DEFAULTS)
+    altered = screen.screen_swing(
+        sessions,
+        {**SWING_CRITERIA, "signal_breakout_window": 2, "signal_cross_lookback": 1,
+         "signal_pullback_pct": 90.0, "signal_extended_pct": 95.0},
+        UNIVERSE_DEFAULTS,
+    )
+
+    assert altered["passing_total"] == baseline["passing_total"]
+    assert altered["rejected"] == baseline["rejected"]
+    assert [r["symbol"] for r in altered["candidates"]] == [
+        r["symbol"] for r in baseline["candidates"]
+    ]
+    assert [r["score"] for r in altered["candidates"]] == [
+        r["score"] for r in baseline["candidates"]
+    ]
