@@ -175,7 +175,7 @@ Forge plugin at `/home/pmallapp/tmp/gh-workflow` is the reference —
 specifically its agent split (`forge-planner` / `forge-coder` /
 `forge-validator`) over a milestone → story → task → PR hierarchy.
 `agents/dev-lifecycle/` holds that port: seventeen Skills, six
-Workflows, and nine References covering project bootstrap,
+Workflows, and ten References covering project bootstrap,
 requirements, design, test plans, implementation, validation,
 milestone close-out, the bug track, and orchestration. Forge itself is untouched and stays an independent
 repo — content moves out of it in one direction only. What the port
