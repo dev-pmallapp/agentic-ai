@@ -144,6 +144,45 @@ row, or a session whose delivery file failed to fetch — carries a null
 delivery percentage. Criteria that use it must treat null as "unknown"
 and say so, never as zero.
 
+## Fundamentals — A Different Contract Entirely
+
+Everything above is price and volume, published by the exchanges as
+files meant to be re-used. Company fundamentals are not in that feed at
+all, and the sources for them are a weaker contract in every respect.
+The full picture is in `References/fundamental-criteria.md`; what
+matters here is how they differ from the data above.
+
+| Source | Endpoint | Nature |
+|---|---|---|
+| Exchange filings | `https://www.nseindia.com/api/results-comparision?symbol={SYMBOL}&period=Quarterly` | The exchange's own quarterly results. Internal JSON API, same class as the announcements endpoint. |
+| screener.in | `https://www.screener.in/company/{SYMBOL}/consolidated/` | Rendered HTML, parsed. Commercial site. |
+| tickertape.in | `https://api.tickertape.in/search` then `/stocks/info/{sid}` | Internal JSON. Needs a ticker→`sid` hop. |
+| moneycontrol.com | `https://priceapi.moneycontrol.com/pricefeed/nse/equitycash/{sc_id}` | Internal JSON. Needs an `sc_id` from a hand-maintained mapping. |
+
+Three differences from the bhavcopy contract, each of which changes how
+the output must be written:
+
+- **Not published for re-use.** The bhavcopy files are put out as files;
+  these are the back ends of commercial products. Fetching is limited to
+  the names a technical screen already passed — dozens a day, cached
+  per quarter — and whether that is acceptable is a judgement the
+  operator makes, not one this document settles.
+- **Unversioned.** An HTML page or an internal endpoint can change shape
+  with no notice and no deprecation. Every provider therefore fails
+  loudly rather than returning half-parsed values, and a run reports
+  which providers failed and for how many names.
+- **The exchange source is the stalest, not the freshest.** Measured on
+  2026-08-21: `results-comparision` returned quarters ending
+  **31-Dec-2024** for every symbol tested while the price feed was
+  current to that day, where screener.in carried quarters through **Jun
+  2026**. So the exchange feed is kept as the credential-free floor
+  rather than the primary, and staleness is gated and reported. The
+  reasoning is set out in `References/fundamental-criteria.md` §
+  Provider Precedence.
+
+A fundamental that no provider answered is **unknown**, never zero and
+never a pass — the same rule delivery percentage already follows below.
+
 ## Caching
 
 A past trading session is **immutable**. Once fetched it is never
@@ -158,6 +197,7 @@ ${XDG_CACHE_HOME:-~/.cache}/ai-agents/india-market-data/
   reference/fo-mktlots.csv
   reference/holidays.json
   announcements/{YYYY-MM-DD}.json
+  fundamentals/{provider}/{key}.{html,json}
 ```
 
 Override with `--cache-dir`. A 60-session history is 60 sessions ×
