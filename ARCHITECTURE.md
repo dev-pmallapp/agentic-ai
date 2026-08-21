@@ -228,11 +228,41 @@ ai-agents/
 | agents | docs | — | agents |
 | harness-adapters | docs | — | harness-adapters |
 | project-docs | docs | — | docs, README.md, ARCHITECTURE.md, CONTRIBUTING.md |
+| ci | ci | — | .github |
 
 One build target is one task. A change to the Python package and a
 change to the agent catalog are separate tasks even when they ship the
 same feature; a change touching three files inside `src/ai_agents` is
 one.
+
+`ci` owns `.github/`. It is a build target rather than unattributed
+infrastructure because the workflow files fail, get fixed, and get
+reviewed like anything else here.
+
+## What CI Checks
+
+Three jobs, in `.github/workflows/ci.yml`, kept separate because they
+fail for different reasons:
+
+| Job | Catches |
+|---|---|
+| `tests` | Broken Python. Matrixed over every version `requires-python` claims (3.10 through 3.14), so the claim has evidence rather than being a promise nothing runs on. |
+| `catalog` | Broken *content*. Runs `.github/scripts/check_catalog.py`. |
+| `package` | A distribution that builds but does not carry the catalog — installs the built wheel into a clean venv outside any checkout and seeds from it. |
+
+The `catalog` job is not redundant with `tests`, and the reason is
+specific to how this repo reads its own content. `catalog.py` parses
+frontmatter with a hand-rolled YAML subset, and **nothing in it raises on
+a malformed header**: `split_frontmatter` returns the whole document as
+body when the fence is unterminated, and `parse_frontmatter` skips lines
+it cannot read. A broken `AGENT.md` therefore yields an entry with an
+empty description rather than an error — which breaks `ai-agents list`
+while the unit suite passes straight through. That is not hypothetical:
+removing one `---` from an agent header leaves all tests green and fails
+the catalog check. So the check asserts on the *parsed result* — a
+non-empty name and description, declared skills and workflows resolving
+to real files, no dangling skill references — never on whether parsing
+threw.
 
 ## What This Does NOT Do Yet
 
