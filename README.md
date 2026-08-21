@@ -134,13 +134,19 @@ Four harnesses are targeted: Claude Code, Cline, Gemini CLI, Qwen Code.
 
 ## Status
 
-Scaffold. The Python package works — `list`, `init`, and `install` do
-what they say. Everything else is deliberately a placeholder:
+Working, pre-release. The CLI does what it says — `list`, `init`,
+`install`, `diff`, `update`, `remove`, `doctor` — and generates pointer
+files for all four harnesses. Six agents are authored: four ported from
+LifeOS, the Forge development lifecycle, and `stock-screening`.
 
-- No harness adapter generates anything yet.
-- `stock-screening`'s two workflows are TODO outlines, not logic. No
-  market-data source is wired.
-- `dev-lifecycle` is a one-file reservation for a future port.
+Known limits:
 
-See `ARCHITECTURE.md` for the design and the full list of what this
-scaffold does not do yet, and `CONTRIBUTING.md` for how to add an agent.
+- `stock-screening` covers **Indian equities only** (NSE and BSE) and is
+  **end-of-day only** — there is no live or intraday path, so the
+  day-trading screen reviews a completed session for a named date.
+- No packaging or CI yet. The catalog is read off a tier root on disk
+  rather than shipped as package data, so a non-editable install has no
+  `agents/` tree to read.
+
+See `ARCHITECTURE.md` for the design and the full list of what this does
+not do yet, and `CONTRIBUTING.md` for how to add an agent.

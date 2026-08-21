@@ -1,7 +1,7 @@
 ---
 pass: 1
 title: Repository scaffold
-status: accepted
+status: superseded-in-part
 created: 2026-08-20
 ---
 
@@ -10,6 +10,19 @@ created: 2026-08-20
 Format precedent: `gh-workflow/docs/design/1-design.md`. This note is
 deliberately much shorter — it documents a scaffolding decision, not a
 feature.
+
+> **Superseded in part.** This note records pass 1 and is left as
+> written; the structural reasoning below still holds, but its
+> statements about what exists no longer describe the repository. Since
+> it was accepted: the anatomy moved to LifeOS-cased `Skills/` and
+> `Workflows/`, and the two stock screens are **Skills**, not workflows;
+> four LifeOS agents and the Forge lifecycle were ported, so
+> `dev-lifecycle` is no longer a bare placeholder; harness adapter
+> generation, the tier lifecycle operations and `doctor` were built; and
+> `stock-screening` gained real criteria and an NSE/BSE end-of-day data
+> path, so no market-data source remains unchosen.
+>
+> `ARCHITECTURE.md` is the current description.
 
 ## Why this structure
 
