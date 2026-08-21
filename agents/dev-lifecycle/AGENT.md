@@ -20,6 +20,7 @@ skills:
   - enhance-debugger
 workflows:
   - autodev
+  - autodev-mytasks
   - planner
   - coder
   - validator
@@ -94,6 +95,7 @@ a fixed position in the run:
 | Kind | Name | Trigger | File |
 |---|---|---|---|
 | Workflow | **autodev** | Run the whole pipeline — or a whole Story's slice of it — with as few manual invocations as possible | `Workflows/autodev.md` |
+| Workflow | **autodev-mytasks** | Implement only the tasks assigned to one engineer, alongside others working the same Story | `Workflows/autodev-mytasks.md` |
 | Workflow | **planner** | Take a milestone or Story from requirements to designed, sized, test-planned, and split into tasks | `Workflows/planner.md` |
 | Workflow | **coder** | Take one task from Open to Resolved — implement, generate unit tests, run them, leave a PR ready | `Workflows/coder.md` |
 | Workflow | **validator** | Every task on a Story is resolved and it needs its plan regrounded, run, and a verdict returned | `Workflows/validator.md` |
