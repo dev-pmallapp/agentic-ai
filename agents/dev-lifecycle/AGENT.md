@@ -1,6 +1,6 @@
 ---
 name: dev-lifecycle
-description: Run a GitHub-native, issue/PR-driven development lifecycle from milestone through story, task, and PR. USE WHEN bootstrapping a project's labels and root docs, turning a milestone's requirements into Story and Task issues, designing a Story, generating test plans, implementing or testing a task, validating a Story before merge, sizing work, reporting pipeline status, checkpointing or resuming a handoff, replanning after a requirement change, extracting milestone learnings, or running the whole pipeline end to end. NOT FOR merging PRs, deleting issues or branches, the bug-fix track, or any lifecycle that isn't GitHub issues plus PRs.
+description: Run a GitHub-native, issue/PR-driven development lifecycle from milestone through story, task, and PR. USE WHEN bootstrapping a project's labels and root docs, turning a milestone's requirements into Story and Task issues, designing a Story, generating test plans, implementing or testing a task, validating a Story before merge, sizing work, reporting pipeline status, checkpointing or resuming a handoff, replanning after a requirement change, extracting milestone learnings, analyzing and fixing a bug, or running the whole pipeline end to end either as one orchestrated run or as one engineer's assigned tasks. NOT FOR merging PRs, deleting issues or branches, or any lifecycle that isn't GitHub issues plus PRs.
 skills:
   - init
   - story-create
@@ -18,8 +18,14 @@ skills:
   - checkpoint
   - resume
   - enhance-debugger
+  - bug-analyze
 workflows:
   - autodev
+  - autodev-mytasks
+  - bug-fix
+  - planner
+  - coder
+  - validator
 ---
 
 # dev-lifecycle
@@ -86,15 +92,38 @@ a fixed position in the run:
 | Skill | **checkpoint** | Work is being handed off or paused, and the state that isn't in git needs recording | `Skills/checkpoint.md` |
 | Skill | **resume** | Picking up an issue that has a checkpoint, whether someone else's or your own | `Skills/resume.md` |
 
+**The bug track** — bugs arrive from outside the Epic/Story/Task
+hierarchy, so they get their own path rather than being forced into
+one:
+
+| Kind | Name | Trigger | File |
+|---|---|---|---|
+| Skill | **bug-analyze** | A `type:bug` issue needs a root cause established before anyone writes a fix | `Skills/bug-analyze.md` |
+| Workflow | **bug-fix** | A bug needs taking end to end — analyze, gate the diagnosis, fix with a verified regression test, gate the fix | `Workflows/bug-fix.md` |
+
+**Orchestration** — cumulative runs that compose the Skills above:
+
 | Kind | Name | Trigger | File |
 |---|---|---|---|
 | Workflow | **autodev** | Run the whole pipeline — or a whole Story's slice of it — with as few manual invocations as possible | `Workflows/autodev.md` |
+| Workflow | **autodev-mytasks** | Implement only the tasks assigned to one engineer, alongside others working the same Story | `Workflows/autodev-mytasks.md` |
+| Workflow | **planner** | Take a milestone or Story from requirements to designed, sized, test-planned, and split into tasks | `Workflows/planner.md` |
+| Workflow | **coder** | Take one task from Open to Resolved — implement, generate unit tests, run them, leave a PR ready | `Workflows/coder.md` |
+| Workflow | **validator** | Every task on a Story is resolved and it needs its plan regrounded, run, and a verdict returned | `Workflows/validator.md` |
 
-Sixteen Skills. The pipeline runs `init` once per project, then
-`story-create` → `story-design` → `story-test-plan` → `task-create` →
-`task-implement` → `task-test-plan` → `task-test` → `story-test`, with
-`enhance-debugger` closing out the milestone once every Story in it is
-closed.
+`planner`, `coder`, and `validator` are the three **worker roles**.
+`autodev` composes them; each is also invocable directly when you want
+one phase of the pipeline without the rest. They are Workflows rather
+than harness agent definitions on purpose — a role can run in an
+isolated subagent where the harness has one, or inline in the main
+session where it does not, with no change to its steps or its output
+contract. See `Workflows/autodev.md` § Running the Workers.
+
+Seventeen Skills and six Workflows. The pipeline runs `init` once per
+project, then `story-create` → `story-design` → `story-test-plan` →
+`task-create` → `task-implement` → `task-test-plan` → `task-test` →
+`story-test`, with `enhance-debugger` closing out the milestone once
+every Story in it is closed.
 
 Each is independently invocable — resuming a stalled Story means
 finding which one its current label state maps to
@@ -108,46 +137,48 @@ absent (at reduced grounding, which those Skills report), and
 `enhance-debugger` is worth running only on a milestone that produced
 learnings worth keeping.
 
+Three Skills carry a **bug mode**, entered only from `bug-fix`:
+`task-implement`, `task-test-plan`, and `task-test`. In it the RCA
+replaces the design doc, the branch is `bug/{issue}-{slug}` off the
+default branch, and parent-Story lookup is skipped. Each Skill
+documents its own deltas in a `## Bug Mode` section.
+
 ## What's Ported and What Isn't
 
-This port covers the full lifecycle above: **16 Skills, 1 Workflow,
-9 References** — a milestone from bootstrap through requirements,
-design, test plans, implementation, validation, and close-out. It is
-not a complete port of Forge, the source plugin (see `## Source`
-below), which also carries a bug-fix track and three agent roles.
+This port now covers **all of Forge's lifecycle surface**: 17 Skills,
+6 Workflows, 9 References — bootstrap, requirements, design, test
+plans, implementation, validation, close-out, the bug track, and
+orchestration in three modes.
 
-Story #9 ported the first 6 Skills and the Workflow; milestone-3 task
-**#28** added the remaining 10 in two batches — the pipeline half
-(`init`, `story-test-plan`, `task-test-plan`) and the utility set
-(`replan`, `story-test-replan`, `status`, `size`, `checkpoint`,
-`resume`, `enhance-debugger`).
+It got there in three passes: story #9 ported the first 6 Skills and
+`autodev`; task **#28** added the remaining 10 Skills; task **#29**
+added the bug track and the orchestration layer.
 
-Deliberately **not** ported, and tracked as milestone-3 tasks in this
-repo:
+Deliberately **not** ported, and tracked as milestone-3 tasks:
 
-- **The bug-fix track** (`bug-fix`, `bug-analyze`, the root-cause
-  document and its sentinel, and the bug-mode branches inside Forge's
-  `task-implement`, `task-test`, and `task-test-plan`) — this port
-  covers the feature path only. `status` shows open bugs in its counts
-  but has no bug view. Task **#29**.
-- **Orchestration beyond `autodev`** (`autodev-mytasks`, and the
-  planner/coder/validator agent roles Forge's skills branch on) — this
-  port folds that branching into the autonomous-versus-interactive
-  distinction each Skill states for itself. Task **#29**.
 - **The scaffolding templates** (`Templates/`) — `init` and
   `enhance-debugger` cite `Templates/ARCHITECTURE.md`,
   `Templates/CONTRIBUTING.md` and `Templates/kb-article.md` by path,
   and degrade explicitly where they are absent. Task **#32**.
-- **Wiring the new Skills into `autodev`** — the Workflow still
-  sequences the original six. Sizing, test-plan generation, and
-  mid-run checkpoints exist as Skills but are not yet steps in an
-  autonomous run. See `Workflows/autodev.md` § Deferred Steps and task
-  **#29**.
+- **Lifecycle hooks** — Forge's 7 hooks have no expression here yet.
+  Tasks **#30** and **#31**.
 - **A Projects v2 board mirror and gh rate-limit backoff** — see
   `References/gh-operations.md` § Out of Scope for This Port.
 
-If a request needs one of these, say so plainly and point at the
-relevant milestone-3 task rather than attempting a partial version of
+Two things are ported **deliberately differently** rather than
+omitted, and both are recorded where they apply:
+
+- **The worker roles are Workflows, not harness agent definitions** —
+  see `## Routing` and `Workflows/autodev.md` § Running the Workers.
+  This is what lets orchestration degrade cleanly onto a harness with
+  no subagent primitive.
+- **`bug-fix` will not merge, even when asked.** The source material
+  allows it on an explicit request; `## Boundaries` here admits no
+  exception. See `Workflows/bug-fix.md` step 7 for why a bug fix is
+  the worst place to make one.
+
+If a request needs something in the first list, say so plainly and
+point at the relevant task rather than attempting a partial version of
 it inline.
 
 ## The gh-Dependency Decision
@@ -251,7 +282,7 @@ keeps without weakening:
   closed only where a merged PR has already made it true (see
   `## Gotchas`).
 - **Never force-pushes without `--force-with-lease`**, and only when a
-  Skill's procedure explicitly calls for it (none of the sixteen Skills
+  Skill's procedure explicitly calls for it (none of the seventeen Skills
   in this port currently do — they push new branches or fast-forward
   only).
 - **Never `git reset --hard`, `git clean`, or `git checkout -f`** to

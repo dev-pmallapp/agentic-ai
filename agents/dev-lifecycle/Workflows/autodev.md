@@ -1,160 +1,266 @@
 # autodev
 
-Runs the full pipeline over a milestone (or a single Story within one):
-`story-create` → per Story (`story-design` → `task-create` → per task
-(`task-implement` → `task-test`) → `story-test`). Sequences the six
-Skills in this port, owns the human approval gates between them, and
-stops rather than merging anything.
+Runs the full pipeline over a milestone, or a single Story within one,
+by composing the three worker roles — `planner` → `coder` (per task) →
+`validator` — with three human gates between them. Stops rather than
+merging anything.
 
-This is a Workflow, not a Skill: it does not do any GitHub or git work
-itself — every action happens inside the Skill it invokes at that
-step — its job is ordering, gating, and reporting across a run that
-can span hours and multiple sessions.
+This is a Workflow, not a Skill: it does no GitHub or git work itself.
+Every action happens inside a role Workflow, and inside the Skills
+those roles invoke. Its job is ordering, gating, verifying what the
+workers claim, and reporting across a run that can span hours and
+several sessions.
 
 ## Purpose
 
-Take a milestone (or one of its Stories) from "requirements written
-down" to "every task implemented, tested, and sitting in review-ready
-PRs," with the fewest engineer touch-points that still keep each
-step's approval gate intact.
+Take a milestone from "requirements written down" to "every task
+implemented, tested, and sitting in review-ready PRs," with the fewest
+engineer touch-points that still keep each gate intact.
 
 ## Preconditions
 
-- A milestone number, or a milestone number plus a specific Story
-  number to run just that Story's pipeline.
-- Everything each invoked Skill itself requires — this Workflow does
-  not re-state those preconditions, it inherits them.
-- A decision, made once at the start of the run and held for its
-  duration, between two modes:
+- A milestone number, or a milestone plus a Story number to run just
+  that Story.
+- Everything each invoked role and Skill requires. This Workflow
+  inherits their preconditions rather than restating them.
+- A mode, chosen once at the start and held for the run:
 
-  - **Interactive run** — a human is present at each gate (design
-    approval, review approval, the choice to proceed past a warning).
-    This is the default.
-  - **Autonomous run** — gates that a Skill defines as "ask the
-    engineer" are instead resolved by the conservative default that
-    Skill's own Errors section specifies (skip, warn-and-continue, or
-    stop — never "guess and proceed" past a stop). Use this only when
-    told to run unattended; still stop at anything a Skill marks as a
-    hard stop rather than a warning.
+  - **Interactive run** — a human is present at each gate. The default.
+  - **Autonomous run** — gates a Skill defines as "ask the engineer"
+    resolve to the conservative default that Skill's own Errors section
+    specifies (skip, warn-and-continue, or stop — never "guess and
+    proceed" past a stop). Use only when told to run unattended, and
+    still stop at anything marked a hard stop rather than a warning.
+
+    One gate is **never** auto-approved in either mode:
+    `enhance-debugger`'s review gate. See `AGENT.md` § Boundaries.
+
+## Running the Workers
+
+The three roles are ordinary Workflows
+(`Workflows/{planner,coder,validator}.md`). How they run is this
+Workflow's decision, made once, from what the harness can do:
+
+- **Harness with a subagent primitive:** run each role in its own
+  worker with its own context. Independent tasks — no `Blocked by:`
+  between them — may run their `coder` workers **concurrently**.
+- **Harness without one:** run the same role Workflows **inline and
+  sequentially** in this session. Identical steps, gates, and output
+  contracts.
+
+State which mode is in use in the opening summary. Inline runs share
+one context, so on a long run `checkpoint` between Stories and tell the
+engineer that resuming means `resume`, not restarting.
+
+**Nothing else changes between the two.** That is the point of the
+roles being Workflows rather than harness agent definitions: the
+degradation is a scheduling difference, not a behavioural one.
+
+### Stall prevention
+
+**A returned worker is done.** Act within one turn of it returning —
+record the result and move on, or loop for a continuation. **Never
+wait, sleep, or poll for a worker.** There is nothing to wait for; the
+return *is* the completion signal.
+
+### Verifying what a worker claims
+
+**Do not trust a worker's self-report.** A write can fail in ways the
+worker does not notice — `gh` exiting 0 having done nothing is a
+documented failure mode (`References/gh-error-handling.md` § 12). A
+`coder` reporting `RESOLVED` while the issue carries no
+`status:resolved` label would corrupt pipeline state silently, and
+every later decision would be made against a lie.
+
+After **every** worker returns, re-read GitHub and reconcile:
+
+```bash
+gh issue view {issue} --repo {repo} --json state,labels,comments
+gh pr list --repo {repo} --head "task/{issue}-*" --state all \
+  --json number,state,isDraft
+```
+
+| Claim | Check | On mismatch |
+|---|---|---|
+| `RESOLVED` | Issue carries `status:resolved` | Apply the label; note the correction |
+| `RESOLVED` | A PR exists and is ready, not draft | Mark it ready; note it |
+| `IMPLEMENTED` | PR exists in draft | Report the gap; do not resolve |
+| any | Claimed commit SHA exists on the branch | Re-run the task; the work is not there |
+| any | Claimed artifact sentinel is on the issue | Note it missing; the artifact is unreachable to later steps |
+
+Correct what is correctable, report every correction, and treat a
+worker whose claims repeatedly fail verification as `BLOCKED` rather
+than continuing to trust it.
+
+A first line that matches none of a role's documented statuses — or an
+empty return — is **`BLOCKED`**. Do not guess at intent.
 
 ## Procedure
 
-**1. Resolve context.** Run `References/context-discovery.md` once,
-up front, so every Skill this run invokes reuses the same resolved
-`{repo}`, `{build_targets}`, `{commands}` instead of re-discovering
-them.
+**1. Resolve context.** Run `References/context-discovery.md` once, up
+front, so every role and Skill in this run reuses the same `{repo}`,
+`{build_targets}`, `{commands}` instead of re-discovering them.
 
-**2. Story generation.** If given a milestone with no Story number,
-run `story-create` against it. Present the resulting Story list (or
-the existing ones, if `story-create` found nothing new) and, in an
-interactive run, get confirmation of which Stories this run should
-carry forward before continuing — a milestone can hold Stories nobody
+**Command pre-flight:** report a missing `build` or `test` command as a
+**warning, not a blocker** — a task with no test command completes as
+`IMPLEMENTED` rather than `RESOLVED`, which is a legitimate outcome the
+engineer should know about at the start rather than discover at the
+end.
+
+**2. Plan.** Run the `planner` role against the milestone (or the
+Story). It creates Stories, designs each, sizes it, generates its test
+plan, and creates its tasks — see `Workflows/planner.md`.
+
+Present its returned plan and, in an interactive run, confirm which
+Stories this run carries forward: a milestone can hold Stories nobody
 wants automated yet.
 
-**3. Per Story, run the Story pipeline:**
+### Gate 1 — design review
 
-   a. **`story-design`.** If a design doc already exists (the Skill's
-      own existing-design gate), it reports and stops immediately —
-      treat that as "already designed," not a failure, and continue to
-      3b. Otherwise it runs the full design session with its own
-      section-by-section approval gates; in an interactive run those
-      gates are real pauses, in an autonomous run they resolve as
-      described above, but the **final design approval** in that
-      Skill's step 7 is never skipped — an unapproved design does not
-      get committed, so this Workflow has nothing to hand `task-create`
-      until a human (or the run's designated stand-in approval,
-      explicitly configured) has signed off.
+Present, per Story: the design doc permalink, the effort estimate, the
+test plan's case count and P0 count, and the task table with build
+targets.
 
-   b. **`task-create`.** Runs once the design doc is committed. Present
-      the created/existing task table before moving on.
+Options: **approve** (continue), **request changes** (feed them back
+to `story-design` for that Story and re-present; a change driven by
+*changed requirements* rather than a bad design is `replan`'s job, not
+another design pass), or **stop**.
 
-   c. **Per task, in dependency order** (respect any `Blocked by:`
-      links `task-create` wrote — do not start a blocked task before
-      the thing blocking it resolves):
+A Story rejected repeatedly stops **that Story** — report it and carry
+on with the others.
 
-      i.  **`task-implement`.**
-      ii. **`task-test`**, immediately after, on the same task —
-          never batch every task's implementation before testing any
-          of them; a broken build target should surface before three
-          more are built on top of the same misunderstanding.
+**3. Per Story, implement.** For each task in dependency order,
+respecting the `Blocked by:` links `task-create` wrote:
 
-      Independent tasks (no `Blocked by:` between them) may run
-      concurrently — spawn one subagent per task if the harness
-      supports running work in parallel, otherwise work through them
-      one at a time in dependency order. Either way, each task still
-      goes through `task-implement` then `task-test` as a pair before
-      the next one starts, per task.
+Run the `coder` role, one per task. Independent tasks may run
+concurrently where the harness allows; a blocked task waits for its
+blocker to resolve.
 
-      A task that fails `task-test` after its own retry budget is
-      **not** retried again here — report it and hold that Story at
-      "tasks in progress," continuing with any of its still-runnable
-      sibling tasks. A Story with a stuck task does not block sibling
-      Stories.
+Each task goes all the way through its `coder` chain — implement,
+generate unit tests, run them — **before the next task starts**, per
+task. Never batch every implementation and test at the end: a broken
+build target should surface before three more are built on the same
+misunderstanding.
 
-   d. **`story-test`**, once every non-test-execution task for this
-      Story is resolved or closed (the check `task-test` itself runs
-      after the last one). Its output is the integration PR.
+Then, per returned worker:
 
-**4. Per-Story summary.** After `story-test` opens the integration PR,
-report it and move to the next Story queued for this run. Do not open
-a Story's integration PR and then keep making changes on that story
-branch from a later step — once `story-test` has run, that Story is
-done from this Workflow's side.
+  a. **Parse the first line** — `RESOLVED`, `IMPLEMENTED`, `PARTIAL`,
+     or `BLOCKED` (`Workflows/coder.md` § Output Contract).
 
-**5. End-of-run summary.** Once every queued Story has reached
-`story-test` (or is parked on a reported failure), report: Stories
-completed with their integration PR links, Stories still blocked and
-why, and the suggestion to run the Epic-level checks in
-`References/workflow-states.md` once those PRs merge. This Workflow
-never merges a PR — see `AGENT.md` `## Boundaries` — so the run's
-actual completion (Stories and tasks closing) happens after a human
-merges what this run opened.
+  b. **Verify the claim** against GitHub, per § Verifying What a Worker
+     Claims.
+
+  c. **`PARTIAL` → continue it**, passing the code path to resume from
+     and what is already done. **At most 3 continuations per task**;
+     still partial after that is `BLOCKED`.
+
+  d. **`IMPLEMENTED` → attempt test recovery.** The cause is a missing
+     `test` command. If one can be resolved now, run `task-test`
+     directly and re-verify; otherwise carry `IMPLEMENTED` forward to
+     Gate 2 as a known gap.
+
+  e. **Squash the task's commits**, if the coder left more than one,
+     and push with `--force-with-lease`.
+
+     **Guard first: every commit being squashed must belong to this
+     task.** Check the range before rewriting anything — a squash that
+     swallows a sibling task's commit destroys work that another
+     worker, or another engineer, is relying on. On any doubt, leave
+     the history alone and report it. Never force-push without
+     `--force-with-lease` (`AGENT.md` § Boundaries).
+
+  f. **`BLOCKED` → hold that task**, report it, and continue with its
+     runnable siblings. A Story with a stuck task does not block
+     sibling Stories.
+
+### Gate 2 — implementation review
+
+Present the task table — task, build target, status, tests, PR — plus
+the counts resolved / implemented / blocked, and any corrections
+verification had to make.
+
+Build the options from what is actually present: **configure a test
+command and run tests** (when any `IMPLEMENTED`), **continue partial**
+(when any `PARTIAL`), **re-run blocked** (when any `BLOCKED`),
+**approve** to proceed to validation, or **stop**. Run an action option
+and loop back to this gate.
+
+**4. Per Story, validate.** Once every implementation task is resolved
+or closed, run the `validator` role. It regrounds the test plan on what
+was built, runs it, and returns PASS / FAIL / PARTIAL /
+TESTS_SKIPPED — see `Workflows/validator.md`.
+
+`FAIL` → hold the Story, report the failing cases, and do not proceed
+to Gate 3 for it.
+
+### Gate 3 — closure review
+
+Per Story: the verdict and counts, the integration PR, any cases
+flagged OUTDATED, and any regressions.
+
+Options: **approve** (the Story is done from this Workflow's side),
+**re-run validation**, or **stop**.
+
+This gate does **not** authorize opening the integration PR — the
+`validator` already opened it, opening PRs being inside this pipeline's
+boundaries. What it gates is the merge, which is a human action this
+Workflow cannot take at all. See `Workflows/validator.md` § What This
+Role Does Not Withhold.
+
+**5. Between Stories on a long run, `checkpoint`.** Especially in an
+inline run, where every Story shares one context. A run that dies
+mid-milestone is resumable from the checkpoint; one that dies without
+is resumable only from whatever landed on GitHub.
+
+**6. End-of-run summary.** Stories completed with their integration PR
+links, Stories held and why, tasks blocked with their reasons, every
+correction verification made, and the suggestion to run the Epic-level
+checks in `References/workflow-states.md` once those PRs merge.
+
+Once every Story in the milestone is closed, `enhance-debugger` is the
+close-out step — it captures the milestone's learnings and closes it.
+Suggest it; do not run it unasked.
+
+This Workflow never merges a PR, so the run's actual completion —
+Stories and tasks closing — happens after a human merges what it
+opened.
 
 ## Deferred Steps
 
-Forge's fuller autodev pipeline includes a sizing pass, a mid-run
-checkpoint/replan loop, and dedicated test-plan generation ahead of
-implementation.
+Nothing from Forge's orchestration is now unported. The mid-run
+`replan` loop is present as a Gate 1 option rather than an automatic
+step, deliberately: a requirement change is a decision, and detecting
+drift is not the same as being authorized to act on it.
 
-Those Skills now **exist** — task #28 ported `size`, `checkpoint`,
-`resume`, `replan`, `story-test-plan`, `story-test-replan` and
-`task-test-plan` — but this Workflow does not yet invoke them. Wiring
-them into an autonomous run is milestone-3 task **#29**, and it is a
-design question rather than a mechanical edit: each one adds a decision
-point, and some add a gate.
-
-Until then the run behaves as before: task granularity is whatever
-`task-create` derived from the design doc, with no separate sizing
-check; there is no mid-run "are we still on track" gate beyond each
-Skill's own approval gates; and `task-test` / `story-test` run against
-whatever test plan `References/artifact-resolution.md` can resolve
-(optional, per those Skills' own procedures) rather than a plan
-generated for this run.
-
-Any of them can still be invoked directly alongside a run — `status` to
-see where a stalled one stopped, `checkpoint` before abandoning one —
-because every Skill here is independently invocable by design.
+`autodev-mytasks` covers the multi-engineer case, and `bug-fix` the
+bug track; both are separate Workflows rather than modes of this one,
+because their gates and scopes genuinely differ.
 
 ## Outputs
 
-Whatever the invoked Skills produce, accumulated across the run:
-Story and task issues, design docs, task and integration PRs, test
-results. This Workflow itself writes nothing new — it has no output
-beyond the sequencing and the summaries in steps 4-5.
+Whatever the invoked roles and Skills produce, accumulated across the
+run: Story and task issues, design docs, effort estimates, test plans,
+task and integration PRs, test results, checkpoints. This Workflow
+writes nothing itself beyond its gate presentations and summaries.
 
 ## Errors
 
-- **A Story's design is rejected repeatedly:** stop that Story's
-  pipeline, report it, continue with other queued Stories.
-- **A task is stuck (failed retries in `task-test`):** hold that
-  Story, report the specific task, continue with independent sibling
-  tasks and other Stories.
-- **`context-discovery` cannot resolve `{build_targets}` at all:**
-  stop the whole run — every downstream Skill needs it.
+- **A Story's design is rejected repeatedly:** stop that Story, report,
+  continue with the others.
+- **A task is `BLOCKED`:** hold it, report, continue with runnable
+  siblings and other Stories.
+- **A worker returns an unrecognized or empty first line:** treat as
+  `BLOCKED`. Do not guess.
+- **A worker's claims fail verification repeatedly:** treat as
+  `BLOCKED` rather than continuing to trust it.
+- **A squash range contains another task's commits:** do not rewrite.
+  Report and leave the history alone.
+- **`context-discovery` cannot resolve `{build_targets}`:** stop the
+  whole run — every downstream step needs it.
 - Anything a called Skill treats as a hard stop is a hard stop here
-  too; this Workflow does not override a Skill's own error handling.
+  too; this Workflow does not override a Skill's error handling.
 
-This Workflow never merges a PR, deletes a branch, deletes an issue,
-force-pushes, or resets/cleans a working tree at any point in this
-sequence — see `AGENT.md` `## Boundaries`, which binds every Skill it
-calls as much as it binds this Workflow directly.
+This Workflow never merges a PR, deletes a branch or an issue,
+force-pushes without `--force-with-lease`, or resets or cleans a
+working tree — see `AGENT.md` § Boundaries, which binds every role and
+Skill it calls as much as it binds this Workflow.

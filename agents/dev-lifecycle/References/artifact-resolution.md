@@ -30,6 +30,7 @@ the permalink when present.
 | Artifact | Sentinel | Path | Producer |
 |---|---|---|---|
 | Design doc | `## dev-lifecycle-design-doc` | `docs/design/{issue}-design.md` | `story-design`, revised by `replan` |
+| Root-cause analysis | `## dev-lifecycle-rca` | `docs/design/{issue}-rca.md` | `bug-analyze` |
 | Test plan | `## dev-lifecycle-test-plan` | `docs/test-plans/{issue}-test-plan.md` | `story-test-plan`, regrounded by `story-test-replan` |
 | Unit test plan | `## dev-lifecycle-unit-tests` | `docs/test-plans/{issue}-unit-tests.md` | `task-test-plan` |
 | Test results | `## dev-lifecycle-test-results` | `docs/test-results/{issue}-{timestamp}.md` | `task-test`, `story-test` |

@@ -181,6 +181,20 @@ None. Running tests and resolving the task is `task-test`'s job.
   that were already covered.
 - **Standard `gh` failures:** `References/gh-error-handling.md`.
 
-The bug track — generating unit tests against a root-cause analysis
-instead of a design doc — is not part of this port. See `AGENT.md`
-§ What's Ported and What Isn't.
+## Bug Mode
+
+Invoked by `Workflows/bug-fix.md` against a `type:bug` issue rather
+than a task. Three differences, and nothing else changes:
+
+- `type:bug` is accepted in place of `type:task`.
+- **The RCA replaces both the design doc and the Story test plan** —
+  resolve `## dev-lifecycle-rca` via
+  `References/artifact-resolution.md` and take the proposed fix and
+  test plan from it. Do not follow the normal design-doc chain.
+- Parent-Story lookup is skipped; a bug has none, and Story-level case
+  mapping does not apply.
+
+The RCA's test plan states that **its first case must fail against the
+unfixed code**. Generate that case first. `bug-fix` step 5 then
+verifies the claim by running it against the pre-fix tree — this Skill
+writes the test, it does not get to assert that the test works.

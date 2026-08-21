@@ -64,7 +64,7 @@ Closed       milestone closed
 | Open | Not started | — |
 | In Progress | Stories being designed or implemented | `story-create`, implicitly, by creating Stories |
 | Resolved | All Stories closed, pending handoff | `story-test`, on the last Story (posts to the tracker) |
-| Closed | Handoff complete | a human, or a future close-out step (not yet ported — see `AGENT.md`) |
+| Closed | Handoff complete | `enhance-debugger`, after its review gate and only once every Story is closed — or a human |
 
 `open_issues` / `closed_issues` on the milestone give the progress
 numbers directly — no issue listing needed for a roll-up count.

@@ -54,12 +54,14 @@ git pull --ff-only
 
 **5. Run the Story's tests.** Resolve a story-level test plan via
 `References/artifact-resolution.md` (sentinel
-`## dev-lifecycle-test-plan`) — optional, since generating one is not
-yet ported (see `AGENT.md`). If found, follow its test list. If
-absent, fall back to running the full project test command from
-`{commands}` scoped to the build targets this Story touched (from the
-design doc's `## Build Targets` table), and say plainly that this is
-reduced grounding without a formal story-level plan.
+`## dev-lifecycle-test-plan`) — **optional**, though `story-test-plan`
+generates one and `story-test-replan` regrounds it, so a Story that
+went through the normal pipeline will have one. If found, follow its
+test list. If absent, fall back to running the full project test
+command from `{commands}` scoped to the build targets this Story
+touched (from the design doc's `## Build Targets` table), and say
+plainly that this is reduced grounding without a formal story-level
+plan.
 
 **On failure:** as in `task-test`, debug with a systematic approach
 where the harness supports it, up to 3 fix-and-rerun iterations across

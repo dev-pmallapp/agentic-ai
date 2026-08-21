@@ -160,5 +160,8 @@ write is the optional informational comment, and only with consent.
   `story-create` first.
 - **Standard `gh` failures:** `References/gh-error-handling.md`.
 
-Sizing bugs from a root-cause analysis is not part of this port — see
-`AGENT.md` § What's Ported and What Isn't.
+- **A `type:bug` issue:** not sized from the issue body. A bug's effort
+  is whatever its **proposed fix** turns out to be, which is knowable
+  only after analysis — route to `bug-analyze`, then size the change
+  list in its Proposed Fix section. Sizing a bug from its symptom
+  measures how alarming the report reads, not how much work the fix is.

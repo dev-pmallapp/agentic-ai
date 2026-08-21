@@ -183,3 +183,21 @@ Task: Open → In Progress (step 3), on invocation.
 
 Once every input issue is processed, stop. A suggested next Skill is
 not authorization to run it.
+
+## Bug Mode
+
+Invoked by `Workflows/bug-fix.md` against a `type:bug` issue. Four
+differences:
+
+- `type:bug` is accepted in place of `type:task`.
+- **The RCA is the design context** — resolve `## dev-lifecycle-rca`
+  via `References/artifact-resolution.md` and implement its Proposed
+  Fix section. There is no design doc and no parent Story to find.
+- The branch is `bug/{issue}-{slug}`, cut off the **default branch**
+  rather than off a story branch.
+- The PR targets the **default branch** and carries `Closes #{issue}`.
+  Unlike a task PR, that keyword fires here — the merge lands on the
+  default branch, which is the condition GitHub requires (`AGENT.md`
+  § Gotchas).
+
+Build verification, review, and the squash step are unchanged.

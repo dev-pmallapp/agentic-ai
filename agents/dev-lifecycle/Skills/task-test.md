@@ -135,3 +135,17 @@ this is the last task.
 
 Once this task is resolved, stop. Do not chain into `story-test` on
 your own initiative — that Skill runs once per Story, not per task.
+
+## Bug Mode
+
+Invoked by `Workflows/bug-fix.md` against a `type:bug` issue. Three
+differences:
+
+- `type:bug` is accepted in place of `type:task`.
+- **Parent-Story lookup and the All Tasks Resolved Check are skipped**
+  — a bug has no parent Story to roll up (step 9 does not apply).
+- On a pass the bug resolves directly, and its PR — which targets the
+  default branch — is marked ready.
+
+Test execution, the 3-iteration retry budget, and the results artifact
+are unchanged.
