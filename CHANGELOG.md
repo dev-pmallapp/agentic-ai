@@ -56,13 +56,20 @@ checkout, no network, and no git. Reasoning in
 independently of them, and a packaging job that installs the built wheel
 outside any checkout and seeds from it.
 
+**External plugins.** `ai-agents plugin install / list / remove` places a
+plugin this repo did not author into a tier verbatim, beside `agents/`
+rather than inside it, and records where it came from. The governing rule
+is one-way — bend the plugin into an agent's anatomy first, and install
+locally only the pieces that genuinely cannot bend. `--reason` is
+required with no default, so an unported piece stays visible rather than
+settling in quietly. `doctor` reports what a tier carries.
+
 ### Known limits
 
 - Not published to a package index; `pipx install ai-agents` does not
   resolve yet. Installing from the repo URL does.
 - `stock-screening` is Indian equities only and end-of-day only — there
   is no live or intraday path.
-- No external plugin installation path.
 
 [Unreleased]: https://github.com/dev-pmallapp/agentic-ai/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/dev-pmallapp/agentic-ai/releases/tag/v0.1.0

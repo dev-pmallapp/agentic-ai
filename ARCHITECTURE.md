@@ -26,6 +26,10 @@ CLI's entire job is copying and pointing.
 │                      user's project (optional)           │
 │   Tools/*            scripts an agent shells out to      │
 ├──────────────────────────────────────────────────────────┤
+│ <tier>/plugins/    external plugins, installed verbatim  │
+│                    beside the catalog — the fallback for │
+│                    pieces that cannot bend into an agent │
+├──────────────────────────────────────────────────────────┤
 │ harness-adapters/  one dir per harness. How that harness │
 │                    discovers instructions, and what its  │
 │                    pointer files will look like          │
@@ -208,6 +212,64 @@ repo — content moves out of it in one direction only. What the port
 deliberately leaves out is recorded in
 `agents/dev-lifecycle/AGENT.md`.
 
+## External Plugins
+
+Adopting an outside plugin runs one way: **the plugin bends to this
+catalog, never the catalog to the plugin.**
+
+Most of one does bend. Forge's references became `References/`, its
+skills became `Skills/`, its orchestration became `Workflows/`, its
+scaffolds became `Templates/` — and where a piece had no direct home,
+the answer was still to express it in this anatomy, as the hook
+contract shows: six shell scripts and a Claude-Code-specific
+`hooks.json` became `References/hook-contract.md`, a document stating
+what each hook guarantees independent of any mechanism.
+
+Some pieces genuinely cannot bend. A harness-specific registration
+schema, a distribution manifest, anything keyed to a harness primitive
+this catalog deliberately does not model. The tempting response is to
+grow a hook registry or a plugin-manifest system here so the piece has
+somewhere to live — and that is precisely bending the repo to fit the
+plugin. Do that a few times and the anatomy is no longer a design, it
+is an accumulation of accommodations.
+
+So the fallback is: install the leftover into a tier **in its own
+native form**, beside the catalog rather than inside it.
+
+```
+.ai-agents/
+  agents/            the catalog. Untouched.
+  plugins/<name>/    one external plugin, verbatim.
+  plugins.json       what is installed, where it came from, and why.
+```
+
+`plugins/` is a sibling of `agents/`, which is what makes the promise
+mechanical instead of a matter of discipline: `catalog.list_agents`
+scans `agents/`, so it cannot see a plugin even when that plugin
+carries an `agents/` directory of its own. Nothing here parses, loads,
+or reshapes a plugin. See `src/ai_agents/plugins.py`.
+
+**The decision rule, in order:**
+
+1. Port the piece into `Skills/`, `Workflows/`, `References/`, or
+   `Templates/`. This is the normal outcome.
+2. If it has no direct equivalent, express *what it guarantees* in
+   this anatomy — `hook-contract.md` over a copied `hooks.json`.
+3. Only if neither works, install it locally as an external plugin —
+   **and record which pieces those were and why.**
+
+Step 3's second half is not paperwork. Without it the fallback becomes
+an excuse to skip step 1, and the catalog degrades into a thin wrapper
+around foreign plugins that nobody ever finished porting. That is why
+`ai-agents plugin install` takes a **required `--reason`** with no
+default, refuses a blank one, and writes it into `plugins.json` where
+`ai-agents doctor` prints it back. A rule that lives only in this
+document depends on the reader's discipline; an argument that cannot be
+omitted does not.
+
+Installing an external plugin is therefore a visible, justified
+exception — never the quiet default.
+
 ## Layout
 
 ```
@@ -243,10 +305,10 @@ ai-agents/
     qwen-code/README.md
   src/ai_agents/
     __init__.py  catalog.py  tiers.py  install.py  lifecycle.py
-    doctor.py  cli.py
+    doctor.py  plugins.py  cli.py
   tests/
     test_catalog.py  test_tiers.py  test_install.py
-    test_lifecycle.py  test_doctor.py
+    test_lifecycle.py  test_doctor.py  test_plugins.py
     test_stock_screening_tools.py  fixtures/
   pyproject.toml
 ```
@@ -314,9 +376,6 @@ Stated plainly so the scope is not overread:
 - **Screening covers Indian equities only.** NSE and BSE, via public
   exchange bhavcopy files. The series codes, circuit rules and delivery
   data it relies on do not generalise to other markets.
-- **No external plugin installation.** The bend-first rule means
-  anything that cannot fit the agent anatomy installs project-locally
-  instead; that path is not built.
 - **Not published to a package index.** The catalog now ships as package
   data, so a wheel installs and seeds without a checkout — but no release
   has been cut, so `pipx install ai-agents` does not resolve yet.
@@ -324,5 +383,6 @@ Stated plainly so the scope is not overread:
 
 What works: the catalog, tier resolution, `install` / `list` / `init`,
 the lifecycle operations (`diff` / `update` / `remove`), `doctor`,
+external plugin install/remove (`plugin install` / `list` / `remove`),
 harness adapter generation for all four harnesses, the LifeOS and Forge
 agent ports, and both stock screens.
