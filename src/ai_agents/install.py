@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from typing import NamedTuple
 
 from . import catalog, tiers
 
@@ -40,9 +41,12 @@ __all__ = [
     "generate_harness_adapters",
     "remove_harness_adapters",
     "detect_harnesses",
+    "harness_probes",
+    "Probe",
     "harness_pointer_path",
     "tier_name_for",
     "HARNESSES",
+    "GENERATED_MARKER",
 ]
 
 #: Every harness this repo knows how to write a pointer for, in the order
@@ -153,6 +157,63 @@ def harness_pointer_path(harness: str, tier_root: Path, tier: str, agent_name: s
     raise ValueError(f"unknown harness {harness!r}")
 
 
+class Probe(NamedTuple):
+    """One path checked during detection, plus the shape it must have.
+
+    The shape is carried rather than inferred because a probe only counts
+    when it is the kind of thing it was meant to be: a regular file named
+    ``.claude`` is not Claude Code being in use, and treating it as such
+    would send generation on to fail with an obscure ``OSError`` trying to
+    create ``.claude/agents/`` underneath a file, instead of cleanly
+    reporting the harness as absent. Testing bare existence would also let
+    a *directory* named ``GEMINI.md`` register as a context file.
+    """
+
+    path: Path
+    kind: str  # "dir" or "file"
+
+    def hit(self) -> bool:
+        """Whether this probe matches what is actually on disk."""
+        return self.path.is_dir() if self.kind == "dir" else self.path.is_file()
+
+
+def harness_probes(harness: str, tier_root: Path, tier: str) -> list[Probe]:
+    """The path(s) checked to decide whether ``harness`` is in use at this tier.
+
+    ``detect_harnesses`` is built directly on top of this — it does not
+    carry any path knowledge of its own — precisely so the two can never
+    drift apart. That matters beyond this module: ``doctor`` (issue #15)
+    needs to report *what was probed* for a harness it calls absent, and
+    the only way for that report to stay honest is to read the probe list
+    from here rather than re-deriving which paths matter for each harness
+    a second time.
+
+    Per-agent harnesses (Claude Code, Cline) probe only their config
+    directory. The context-file harnesses (Gemini CLI, Qwen Code) probe
+    both their config directory *and* the context file itself, since a
+    project can have a hand-written ``GEMINI.md``/``QWEN.md`` with no
+    ``.gemini/``/``.qwen/`` at all — either one existing is enough.
+    """
+    root = _harness_root(tier_root, tier)
+
+    if harness == "claude-code":
+        return [Probe(root / ".claude", "dir")]
+    if harness == "cline":
+        return [Probe(root / ".clinerules", "dir")]
+    if harness == "gemini-cli":
+        return [
+            Probe(root / ".gemini", "dir"),
+            Probe(harness_pointer_path("gemini-cli", tier_root, tier, "_"), "file"),
+        ]
+    if harness == "qwen-code":
+        return [
+            Probe(root / ".qwen", "dir"),
+            Probe(harness_pointer_path("qwen-code", tier_root, tier, "_"), "file"),
+        ]
+
+    raise ValueError(f"unknown harness {harness!r}")
+
+
 def detect_harnesses(tier_root: Path, tier: str) -> list[str]:
     """Which harnesses are in use at this tier, in ``HARNESSES`` order.
 
@@ -162,25 +223,14 @@ def detect_harnesses(tier_root: Path, tier: str) -> list[str]:
     visible to the tools someone actually uses; it should not litter a repo
     with config directories for three tools they don't.
 
+    A harness counts as detected when any one of its ``harness_probes``
+    hits — see ``harness_probes`` and ``Probe`` for exactly what is checked
+    and why the shape matters.
+
     Kept separate from generation so it can be tested on its own and so
     ``doctor`` (issue #15) can reuse it to report what it found.
     """
-    root = _harness_root(tier_root, tier)
-    found = []
-
-    if (root / ".claude").is_dir():
-        found.append("claude-code")
-    if (root / ".clinerules").is_dir():
-        found.append("cline")
-    # The context-file harnesses are detected by either their config
-    # directory or a context file already sitting at the root, since a
-    # project can have a hand-written GEMINI.md and no .gemini/ at all.
-    if (root / ".gemini").is_dir() or harness_pointer_path("gemini-cli", tier_root, tier, "_").is_file():
-        found.append("gemini-cli")
-    if (root / ".qwen").is_dir() or harness_pointer_path("qwen-code", tier_root, tier, "_").is_file():
-        found.append("qwen-code")
-
-    return found
+    return [h for h in HARNESSES if any(p.hit() for p in harness_probes(h, tier_root, tier))]
 
 
 # --------------------------------------------------------------------------

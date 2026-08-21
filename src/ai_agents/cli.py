@@ -3,7 +3,8 @@
 ``init`` populates the user master tier, ``list`` shows what is in it,
 ``install`` copies one agent down into a project or workspace tier,
 ``update``/``diff``/``remove`` maintain an agent already installed there,
-and ``doctor`` is reserved for environment checks.
+and ``doctor`` reports harness detection, tier contents, and drift across
+all three tiers at once (see ``doctor.py``).
 
 The CLI's whole job is moving agent directories between tiers. It does not
 interpret an agent's content — that is the harness's job.
@@ -24,6 +25,9 @@ from pathlib import Path
 import click
 
 from . import __version__, catalog, install, lifecycle, tiers
+# Names, not the module: the `doctor` command below shadows a module
+# import of the same name.
+from .doctor import ERROR, INFO, OK, WARN, run_checks
 
 
 def _tier_options(f):
@@ -275,10 +279,99 @@ def remove_cmd(name: str, tier: str) -> None:
     _echo_pointer_results(result["pointers"], empty_note="no pointer files to clean up")
 
 
+#: Short tag printed ahead of every doctor finding. Kept to four characters
+#: so every line lines up regardless of status; ``info`` prints as ``--``
+#: rather than a word, since the whole point of that status is that it is
+#: not something to alarm about — see ``doctor.py``'s module docstring for
+#: the vocabulary this maps.
+_DOCTOR_TAGS = {OK: "ok  ", INFO: "--  ", WARN: "warn", ERROR: "FAIL"}
+
+
+def _doctor_tag(status: str) -> str:
+    return _DOCTOR_TAGS[status]
+
+
+def _echo_doctor_harnesses(findings: list[dict]) -> None:
+    """Render ``doctor.run_checks()["harnesses"]``, grouped by tier.
+
+    Absence is printed with exactly what was probed for it (the paths
+    ``install.harness_probes`` reported) so "absent" is never a bare
+    unsupported claim — see the honesty requirement in issue #15.
+    """
+    click.echo("Harnesses:")
+    current_tier = None
+    for f in findings:
+        if f["tier"] != current_tier:
+            current_tier = f["tier"]
+            click.echo(f"  {current_tier}:")
+        if f["detected"]:
+            click.echo(f"    [{_doctor_tag(f['status'])}] {f['harness']:<12} detected at {f['matched']}")
+        else:
+            probed = ", ".join(str(p) for p in f["probed"])
+            click.echo(f"    [{_doctor_tag(f['status'])}] {f['harness']:<12} absent (probed {probed})")
+
+
+def _echo_doctor_tiers(findings: list[dict]) -> None:
+    """Render ``doctor.run_checks()["tiers"]`` — one line per tier."""
+    click.echo("\nTiers:")
+    for f in findings:
+        tag = _doctor_tag(f["status"])
+        if f["root"] is None:
+            click.echo(f"  [{tag}] {f['tier']:<10} {f['detail']}")
+            continue
+        if not f["exists"]:
+            click.echo(f"  [{tag}] {f['tier']:<10} {f['root']} — {f['detail']}")
+        else:
+            click.echo(f"  [{tag}] {f['tier']:<10} {f['root']} ({f['agent_count']} agent(s))")
+        if f["fix"]:
+            click.echo(f"           fix: {f['fix']}")
+
+
+def _echo_doctor_agents(findings: list[dict]) -> None:
+    """Render ``doctor.run_checks()["agents"]`` — integrity, drift, and
+    dangling-reference findings, one per line, with a fix line for anything
+    reported as broken or drifted.
+    """
+    click.echo("\nAgents:")
+    if not findings:
+        click.echo("  (none installed below the user master tier)")
+        return
+    for f in findings:
+        tag = _doctor_tag(f["status"])
+        click.echo(f"  [{tag}] [{f['tier']}] {f['agent']:<24} {f['detail']}")
+        if f["fix"]:
+            click.echo(f"           fix: {f['fix']}")
+
+
 @cli.command()
 def doctor() -> None:
-    """Check the environment. STUB."""
-    click.echo("planned checks: harness detection, tier contents — not yet implemented")
+    """Report harness detection, tier contents, and drift.
+
+    Purely read-only, like ``diff`` — nothing here writes to disk. Exits
+    non-zero only when something is genuinely broken (see ``doctor.py``'s
+    module docstring for exactly what qualifies); an absent optional
+    harness, an empty tier, or a merely-diverged installed copy are all
+    normal conditions and never affect the exit code.
+    """
+    report = run_checks(Path.cwd())
+
+    _echo_doctor_harnesses(report["harnesses"])
+    _echo_doctor_tiers(report["tiers"])
+    _echo_doctor_agents(report["agents"])
+
+    # All three lists, so the tally can never undercount against the exit
+    # code doctor.run_checks computed from the same three.
+    findings = (*report["tiers"], *report["harnesses"], *report["agents"])
+    problems = [f for f in findings if f["status"] in (WARN, ERROR)]
+    if report["has_errors"]:
+        errors = sum(1 for f in problems if f["status"] == ERROR)
+        warnings = sum(1 for f in problems if f["status"] == WARN)
+        click.echo(f"\n{errors} error(s), {warnings} warning(s) — see fix lines above.")
+        raise SystemExit(1)
+    elif problems:
+        click.echo(f"\n{len(problems)} warning(s) — nothing broken.")
+    else:
+        click.echo("\nAll checks passed.")
 
 
 if __name__ == "__main__":  # pragma: no cover
