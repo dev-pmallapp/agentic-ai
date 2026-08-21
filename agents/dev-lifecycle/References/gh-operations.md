@@ -242,6 +242,11 @@ gh pr list --repo {repo} --head "task/{task}-{slug}" \
 
 A Projects v2 board mirror, and rate-limit backoff, are both part of
 Forge's fuller `gh-operations.md` and are not carried into this port —
-neither is needed by the six Skills and one Workflow authored here.
+neither is needed by the sixteen Skills and one Workflow authored here.
 Labels remain the sole source of truth. See `AGENT.md` for what is
 deferred and where.
+
+`status` is the one Skill that can fan out far enough to feel the
+absence of backoff, and it bounds itself instead: above ten open
+milestones it drops to milestone-level counts and says so, rather than
+issuing a call per Story.
