@@ -22,6 +22,8 @@ CLI's entire job is copying and pointing.
 │   Skills/*.md        atomic, individually invocable      │
 │   Workflows/*.md     cumulative, compose Skills          │
 │   References/*.md    shared contracts, cited by both     │
+│   Templates/*        shapes an agent writes into a       │
+│                      user's project (optional)           │
 │   Tools/*            scripts an agent shells out to      │
 ├──────────────────────────────────────────────────────────┤
 │ harness-adapters/  one dir per harness. How that harness │
@@ -69,8 +71,32 @@ A **Skill** (`Skills/*.md`) does one thing end to end and is
 individually invocable — a harness can run it on its own, with nothing
 else loaded first. A **Workflow** (`Workflows/*.md`) is cumulative: it
 sequences Skills toward a larger outcome and owns any human approval
-gates along the way. `References/*.md` and `Tools/*` are shared by both
-kinds; neither owns them.
+gates along the way. `References/*.md`, `Templates/*`, and `Tools/*`
+are shared by both kinds; neither owns them.
+
+**References versus Templates**, since both are markdown an agent
+cites by path and the distinction is easy to lose: a **Reference** is
+a contract the agent *reads* to decide what to do — the `gh` error
+taxonomy, the state machine, the sizing rules. A **Template** is a
+shape the agent *writes into a user's project*, or a file the user
+installs into their own repository. A Reference stays inside the
+catalog; a Template's whole purpose is to leave it.
+
+That distinction is what decides where a file goes when it could
+plausibly be either. `dev-lifecycle`'s `commit-msg` git hook is a
+Template rather than a `Tool`, because `Tools/` is code the agent
+runs and the hook is a file the user copies into `.git/hooks/`. It is
+also the one place the Python-first rule does not reach: it stays
+bash, because it executes on every commit in someone else's
+repository and must not add an interpreter dependency that repository
+did not already have.
+
+`Templates/` is **optional** — `stock-screening` has none, and an
+agent that never writes into a user's project should not have the
+directory at all. Nothing in the CLI requires it: `install` copies the
+whole agent directory with `shutil.copytree`, so a `Templates/` tree
+ships wherever it exists with no packaging or code change, and its
+absence is not a special case.
 
 The composition rule runs one direction only: a Workflow may compose
 Skills, **and may compose other Workflows**; a Skill never depends on a
@@ -175,9 +201,9 @@ Forge plugin at `/home/pmallapp/tmp/gh-workflow` is the reference —
 specifically its agent split (`forge-planner` / `forge-coder` /
 `forge-validator`) over a milestone → story → task → PR hierarchy.
 `agents/dev-lifecycle/` holds that port: seventeen Skills, six
-Workflows, and ten References covering project bootstrap,
-requirements, design, test plans, implementation, validation,
-milestone close-out, the bug track, and orchestration. Forge itself is untouched and stays an independent
+Workflows, ten References, and seven Templates covering project
+bootstrap, requirements, design, test plans, implementation,
+validation, milestone close-out, the bug track, and orchestration. Forge itself is untouched and stays an independent
 repo — content moves out of it in one direction only. What the port
 deliberately leaves out is recorded in
 `agents/dev-lifecycle/AGENT.md`.
@@ -203,9 +229,10 @@ ai-agents/
       Workflows/                  (empty by design)
     dev-lifecycle/
       AGENT.md
-      Skills/                     6 skills ported from Forge
-      References/                 5 ported contracts
-      Workflows/autodev.md
+      Skills/                     17 Skills ported from Forge
+      Workflows/                  6, incl. autodev and the 3 worker roles
+      References/                 10 contracts, incl. the hook contract
+      Templates/                  7 scaffolds + the commit-msg git hook
       Tools/                      (empty by design)
     BiasCheck/  ExtractWisdom/  FirstPrinciples/  RootCauseAnalysis/
       AGENT.md + Skills/          ported from LifeOS

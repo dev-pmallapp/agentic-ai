@@ -162,7 +162,9 @@ exit code is non-zero only when something is reported as broken (`FAIL`).
 | `agents/<Name>/AGENT.md` | Persona and a routing table over the agent's skills and workflows |
 | `agents/<Name>/Skills/*.md` | Atomic procedures, each individually invocable |
 | `agents/<Name>/Workflows/*.md` | Cumulative procedures that compose Skills and own the gates between them |
-| `agents/<Name>/References/`, `Tools/` | Shared contracts; scripts the agent shells out to |
+| `agents/<Name>/References/` | Shared contracts the agent reads, cited by Skills and Workflows alike |
+| `agents/<Name>/Templates/` | Document shapes the agent writes into a user's project, and files the user installs |
+| `agents/<Name>/Tools/` | Scripts the agent shells out to |
 | `harness-adapters/<harness>/` | How one harness discovers instructions, and what its pointer files will look like |
 | `src/ai_agents/` | The CLI — catalog, tier resolution, copying |
 | `docs/design/` | Numbered design notes, one per pass |
