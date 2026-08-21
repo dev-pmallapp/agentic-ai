@@ -69,6 +69,44 @@ must have already run, or does it own an approval gate over a sequence?
 If it only says "consider running X next," that's a Skill pointing at
 a sibling Skill, not a Workflow.
 
+### AGENT.md is persona and routing. The method goes in the Skill.
+
+`SKILL.md` → `AGENT.md` is the closest thing to copy-paste in the
+mapping table, and that is exactly what makes it a trap: a LifeOS
+`SKILL.md` often carries the whole method — tone rules, output format,
+quality checks — because LifeOS has nowhere else to put it. Copy that
+across verbatim and you get an `AGENT.md` holding the procedure and a
+`Skills/` file that only points back at it.
+
+**Port fidelity governs content, not which file it lands in.** Keep
+every rule, example, and table the source had; put the method under
+`Skills/`, and leave `AGENT.md` with persona, the problem it solves,
+routing, boundaries, and examples.
+
+Two things make this worth the one deliberate deviation from source
+shape:
+
+- **A Skill must run alone.** `ARCHITECTURE.md` has it that a Skill is
+  "individually invocable — a harness can run it on its own, with
+  nothing else loaded first." A Skill whose method lives in `AGENT.md`
+  cannot honour that, and the harnesses that load Skills on demand are
+  precisely the ones that will not have `AGENT.md` in context.
+- **The dependency inverts.** `AGENT.md` routes *to* a Skill. A Skill
+  that reaches back up for its own procedure makes the routing table a
+  formality.
+
+**A selection aid is not method, and stays in `AGENT.md`.** A table of
+which mode to pick and when — `BiasCheck`'s Quick Reference,
+`RootCauseAnalysis`'s Method Selection Guide, `ExtractWisdom`'s depth
+levels — is routing under another name. Where such a table mixes
+selection with structure, split it: which-to-pick in `AGENT.md`,
+what-it-produces in the Skill.
+
+Measured against this, three of the four LifeOS ports already
+conformed. `ExtractWisdom` was the single inversion — a 292-line
+`AGENT.md` over a 34-line Skill — and was rebalanced in issue #52. It
+is the shape of the *source* that varies, so check rather than assume.
+
 ## 2. What gets stripped
 
 ### Voice notification blocks
@@ -352,12 +390,22 @@ root.
    `SystemsThinking` trap from §1: a file that only says "consider
    running X next" belongs in `Skills/`.
 
-4. **Tests still pass.**
+4. **The method ended up in the Skills, not in `AGENT.md`.**
+   ```bash
+   wc -l agents/<Name>/AGENT.md agents/<Name>/Skills/*.md
+   ```
+   Line count is a smell, not a rule — but an `AGENT.md` longer than
+   the Skills it routes to almost always means the method landed in
+   the wrong file (§1). Confirm by reading the Skill alone: if it
+   cannot be followed without opening `AGENT.md`, it is not
+   individually invocable and the content has to move down.
+
+5. **Tests still pass.**
    ```bash
    pytest -q
    ```
 
-5. **`ai-agents list` picks it up**, after refreshing the user tier
+6. **`ai-agents list` picks it up**, after refreshing the user tier
    (`init` refuses to overwrite an existing `~/.ai-agents`, so a repo
    check that already ran `init` won't see new agents without this):
    ```bash
