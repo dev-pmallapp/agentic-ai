@@ -113,16 +113,27 @@ merges what this run opened.
 ## Deferred Steps
 
 Forge's fuller autodev pipeline includes a sizing pass, a mid-run
-checkpoint/replan loop, and dedicated test-plan generation skills
-(`task-test-plan`, `story-test-plan`) ahead of implementation. None of
-those are ported yet — see `AGENT.md` for what is and is not in this
-port. Their absence means: task granularity is whatever `task-create`
-derived from the design doc with no separate sizing check, there is no
-mid-run "are we still on track" gate beyond each Skill's own approval
-gates, and `task-test` / `story-test` run against whatever test plan
-`References/artifact-resolution.md` can resolve (optional, per those
-Skills' own procedures) rather than a plan generated specifically for
-this run.
+checkpoint/replan loop, and dedicated test-plan generation ahead of
+implementation.
+
+Those Skills now **exist** — task #28 ported `size`, `checkpoint`,
+`resume`, `replan`, `story-test-plan`, `story-test-replan` and
+`task-test-plan` — but this Workflow does not yet invoke them. Wiring
+them into an autonomous run is milestone-3 task **#29**, and it is a
+design question rather than a mechanical edit: each one adds a decision
+point, and some add a gate.
+
+Until then the run behaves as before: task granularity is whatever
+`task-create` derived from the design doc, with no separate sizing
+check; there is no mid-run "are we still on track" gate beyond each
+Skill's own approval gates; and `task-test` / `story-test` run against
+whatever test plan `References/artifact-resolution.md` can resolve
+(optional, per those Skills' own procedures) rather than a plan
+generated for this run.
+
+Any of them can still be invoked directly alongside a run — `status` to
+see where a stalled one stopped, `checkpoint` before abandoning one —
+because every Skill here is independently invocable by design.
 
 ## Outputs
 

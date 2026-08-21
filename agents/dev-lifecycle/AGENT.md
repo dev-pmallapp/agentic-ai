@@ -1,13 +1,23 @@
 ---
 name: dev-lifecycle
-description: Run a GitHub-native, issue/PR-driven development lifecycle from milestone through story, task, and PR. USE WHEN turning a milestone's requirements into Story and Task issues, designing a Story, implementing or testing a task, validating a Story before merge, or running the whole pipeline end to end. NOT FOR merging PRs, closing or deleting issues and branches on your own initiative, generating a sizing/checkpoint plan (not yet ported), or any lifecycle that isn't GitHub issues plus PRs.
+description: Run a GitHub-native, issue/PR-driven development lifecycle from milestone through story, task, and PR. USE WHEN bootstrapping a project's labels and root docs, turning a milestone's requirements into Story and Task issues, designing a Story, generating test plans, implementing or testing a task, validating a Story before merge, sizing work, reporting pipeline status, checkpointing or resuming a handoff, replanning after a requirement change, extracting milestone learnings, or running the whole pipeline end to end. NOT FOR merging PRs, deleting issues or branches, the bug-fix track, or any lifecycle that isn't GitHub issues plus PRs.
 skills:
+  - init
   - story-create
   - story-design
+  - story-test-plan
   - task-create
   - task-implement
+  - task-test-plan
   - task-test
   - story-test
+  - story-test-replan
+  - replan
+  - size
+  - status
+  - checkpoint
+  - resume
+  - enhance-debugger
 workflows:
   - autodev
 ---
@@ -49,49 +59,90 @@ This agent opens pull requests. It never merges one — see
 
 ## Routing
 
+**The pipeline**, in the order a Story passes through it:
+
 | Kind | Name | Trigger | File |
 |---|---|---|---|
+| Skill | **init** | A project has no labels or no `## Build Targets` / `## Commands` table yet — run once, before anything else | `Skills/init.md` |
 | Skill | **story-create** | A milestone has requirements but no (or incomplete) Story issues yet | `Skills/story-create.md` |
 | Skill | **story-design** | A Story exists and needs a design doc before tasks can be created | `Skills/story-design.md` |
+| Skill | **story-test-plan** | A Story has an approved design doc and needs a test plan generated from it | `Skills/story-test-plan.md` |
 | Skill | **task-create** | A Story has an approved design doc but no (or incomplete) task sub-issues | `Skills/task-create.md` |
 | Skill | **task-implement** | A task (or a Story, expanded to its unresolved tasks) needs code written | `Skills/task-implement.md` |
+| Skill | **task-test-plan** | A task has an implementation and needs unit test cases and test code written against it | `Skills/task-test-plan.md` |
 | Skill | **task-test** | A task has a draft PR from `task-implement` and needs unit tests run and its PR marked ready | `Skills/task-test.md` |
 | Skill | **story-test** | Every task on a Story is resolved and the Story needs end-to-end validation plus an integration PR | `Skills/story-test.md` |
+| Skill | **enhance-debugger** | Every Story in a milestone is closed, and the milestone needs its learnings captured and itself closed | `Skills/enhance-debugger.md` |
+
+**The utility set** — invoked when something changes or stalls, not on
+a fixed position in the run:
+
+| Kind | Name | Trigger | File |
+|---|---|---|---|
+| Skill | **status** | "Where are we, what's next" — for a project, a milestone, an issue, or a person | `Skills/status.md` |
+| Skill | **size** | Relative effort (S/M/L/XL) is needed for a milestone, Story, or task before committing to scope | `Skills/size.md` |
+| Skill | **replan** | A Story's requirements changed after its design was agreed | `Skills/replan.md` |
+| Skill | **story-test-replan** | A test plan predates the implementation and needs regrounding on the code actually written | `Skills/story-test-replan.md` |
+| Skill | **checkpoint** | Work is being handed off or paused, and the state that isn't in git needs recording | `Skills/checkpoint.md` |
+| Skill | **resume** | Picking up an issue that has a checkpoint, whether someone else's or your own | `Skills/resume.md` |
+
+| Kind | Name | Trigger | File |
+|---|---|---|---|
 | Workflow | **autodev** | Run the whole pipeline — or a whole Story's slice of it — with as few manual invocations as possible | `Workflows/autodev.md` |
 
-Six Skills, in the order a Story normally passes through them:
-`story-create` → `story-design` → `task-create` → `task-implement` →
-`task-test` → `story-test`. Each is independently invocable — resuming
-a stalled Story means finding which of these six its current label
-state maps to (`References/workflow-states.md`) and invoking that one
-directly, not necessarily running `autodev` from the top.
+Sixteen Skills. The pipeline runs `init` once per project, then
+`story-create` → `story-design` → `story-test-plan` → `task-create` →
+`task-implement` → `task-test-plan` → `task-test` → `story-test`, with
+`enhance-debugger` closing out the milestone once every Story in it is
+closed.
+
+Each is independently invocable — resuming a stalled Story means
+finding which one its current label state maps to
+(`References/workflow-states.md`), or asking `status`, and invoking
+that directly rather than running `autodev` from the top.
+
+Three of the pipeline Skills are **optional in practice**:
+`story-test-plan` and `task-test-plan` generate plans that `story-test`
+and `task-test` will otherwise resolve if present and run without if
+absent (at reduced grounding, which those Skills report), and
+`enhance-debugger` is worth running only on a milestone that produced
+learnings worth keeping.
 
 ## What's Ported and What Isn't
 
-This port covers exactly the pipeline above: **6 Skills, 1 Workflow,
-5 References**, enough to take a milestone from requirements to
-review-ready PRs with no gaps in that specific path. It is not a full
-port of Forge, the source plugin (see `## Source` below), which has 20
-skills across three agent roles plus a bug-fix track.
+This port covers the full lifecycle above: **16 Skills, 1 Workflow,
+9 References** — a milestone from bootstrap through requirements,
+design, test plans, implementation, validation, and close-out. It is
+not a complete port of Forge, the source plugin (see `## Source`
+below), which also carries a bug-fix track and three agent roles.
 
-Deliberately **not** ported here, tracked as milestone-3 tasks **#28**
-and **#29** in this repo:
+Story #9 ported the first 6 Skills and the Workflow; milestone-3 task
+**#28** added the remaining 10 in two batches — the pipeline half
+(`init`, `story-test-plan`, `task-test-plan`) and the utility set
+(`replan`, `story-test-replan`, `status`, `size`, `checkpoint`,
+`resume`, `enhance-debugger`).
 
-- **Dedicated test-plan generation** (`task-test-plan`,
-  `story-test-plan`) — `task-test` and `story-test` in this port
-  resolve a test plan if one exists (optional input) and otherwise run
-  the project's general test command, noting the reduced grounding.
-  Generating a plan up front is future work.
-- **Sizing and mid-run checkpoints** (`size`, `checkpoint`, `replan`)
-  — `autodev` has no sizing pass and no mid-run "are we still on
-  track" gate beyond each Skill's own approval gates. See
-  `Workflows/autodev.md` § Deferred Steps.
-- **The bug-fix track** (`bug-fix`, `bug-analyze`, and the `--bug`
-  mode branches inside Forge's `task-implement`/`task-test`) — this
-  port's `task-implement` and `task-test` cover the feature path only.
-- **Epic close-out** — nothing here closes a milestone. See
-  `References/workflow-states.md` § Epic Lifecycle: Closed "is a
-  human, or a future close-out step (not yet ported)."
+Deliberately **not** ported, and tracked as milestone-3 tasks in this
+repo:
+
+- **The bug-fix track** (`bug-fix`, `bug-analyze`, the root-cause
+  document and its sentinel, and the bug-mode branches inside Forge's
+  `task-implement`, `task-test`, and `task-test-plan`) — this port
+  covers the feature path only. `status` shows open bugs in its counts
+  but has no bug view. Task **#29**.
+- **Orchestration beyond `autodev`** (`autodev-mytasks`, and the
+  planner/coder/validator agent roles Forge's skills branch on) — this
+  port folds that branching into the autonomous-versus-interactive
+  distinction each Skill states for itself. Task **#29**.
+- **The scaffolding templates** (`Templates/`) — `init` and
+  `enhance-debugger` cite `Templates/ARCHITECTURE.md`,
+  `Templates/CONTRIBUTING.md` and `Templates/kb-article.md` by path,
+  and degrade explicitly where they are absent. Task **#32**.
+- **Wiring the new Skills into `autodev`** — the Workflow still
+  sequences the original six. Sizing, test-plan generation, and
+  mid-run checkpoints exist as Skills but are not yet steps in an
+  autonomous run. See `Workflows/autodev.md` § Deferred Steps and task
+  **#29**.
 - **A Projects v2 board mirror and gh rate-limit backoff** — see
   `References/gh-operations.md` § Out of Scope for This Port.
 
@@ -111,8 +162,8 @@ content should live: inline in each Skill, or factored into
 
 **Decision:** a Skill states inline only the commands specific to its
 own step — the particular labels, titles, and body shapes it creates
-or edits. Anything repeated identically across two or more of the six
-Skills lives once in `References/` and is cited by path:
+or edits. Anything repeated identically across two or more Skills
+lives once in `References/` and is cited by path:
 
 | Reference | Consolidates |
 |---|---|
@@ -125,6 +176,13 @@ Skills lives once in `References/` and is cited by path:
 | `References/build-systems.md` | Build-target detection per language, and why the declared table beats filesystem discovery |
 | `References/project-commands.md` | Where build/test/lint commands live, their placeholders, and their pass criteria |
 | `References/sizing-criteria.md` | T-shirt sizing at task, Story, and Epic level, and the data-limited estimate |
+
+One contract deliberately lives in a Skill rather than a Reference: the
+**label set** — names, colours, descriptions — is a table in
+`Skills/init.md`, because `init` is the only thing that creates labels
+and every other consumer needs just one row of it at a time.
+`References/gh-error-handling.md` § 7 cites that table for single-label
+repair, and `References/workflow-states.md` treats the labels as given.
 
 ### Source-to-reference mapping
 
@@ -182,10 +240,19 @@ keeps without weakening:
   `References/branch-and-pr-model.md` § Merge Order.
 - **Never deletes a branch or an issue.** Stale-branch cleanup after a
   merge is suggested in a run's final summary, not performed — see
-  `References/branch-and-pr-model.md` § Stale Branch Cleanup.
+  `References/branch-and-pr-model.md` § Stale Branch Cleanup. Descoped
+  work is closed as `not_planned` with a reason (`replan`), never
+  deleted.
+- **Closes exactly one thing on its own initiative: a milestone whose
+  Stories are all closed**, and only through `enhance-debugger`, only
+  after that Skill's mandatory review gate, and only once it has
+  verified every Story is closed. Nothing else here closes an Epic —
+  see `References/workflow-states.md` § Epic Lifecycle. Issues are
+  closed only where a merged PR has already made it true (see
+  `## Gotchas`).
 - **Never force-pushes without `--force-with-lease`**, and only when a
-  Skill's procedure explicitly calls for it (none of the six Skills in
-  this port currently do — they push new branches or fast-forward
+  Skill's procedure explicitly calls for it (none of the sixteen Skills
+  in this port currently do — they push new branches or fast-forward
   only).
 - **Never `git reset --hard`, `git clean`, or `git checkout -f`** to
   clear a dirty or detached working tree. An engineer's uncommitted

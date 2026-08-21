@@ -28,19 +28,33 @@ def test_stock_screening_has_both_skills_and_no_workflows():
 
 
 def test_dev_lifecycle_has_the_ported_skills_and_workflow():
-    # Story #9 replaced the placeholder with a real port of six Skills and
-    # one Workflow (autodev) — see agents/dev-lifecycle/AGENT.md "What's
-    # Ported and What Isn't" for what remains deferred.
+    # Story #9 replaced the placeholder with a port of six Skills and one
+    # Workflow (autodev); story #23 (task #28) added the remaining ten —
+    # the pipeline half (init, story-test-plan, task-test-plan) and the
+    # utility set. See agents/dev-lifecycle/AGENT.md "What's Ported and
+    # What Isn't" for what remains deferred.
     agents = {a["name"]: a for a in catalog.list_agents(REPO_ROOT)}
     dev_lifecycle = agents["dev-lifecycle"]
 
     assert set(dev_lifecycle["skills"]) == {
+        # pipeline, in run order
+        "init",
         "story-create",
         "story-design",
+        "story-test-plan",
         "task-create",
         "task-implement",
+        "task-test-plan",
         "task-test",
         "story-test",
+        "enhance-debugger",
+        # utility
+        "status",
+        "size",
+        "replan",
+        "story-test-replan",
+        "checkpoint",
+        "resume",
     }
     assert dev_lifecycle["workflows"] == ["autodev"]
     assert catalog.find_dangling_skill_refs(dev_lifecycle) == []

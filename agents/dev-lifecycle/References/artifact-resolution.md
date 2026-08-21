@@ -1,12 +1,12 @@
 # Artifact Resolution
 
 How this pipeline stores and re-finds the markdown artifacts it
-produces — design docs, test plans, unit test plans, test results.
-GitHub issues have no attachment API, so the durable store is the
-repository itself, and the issue comment carries the content or a
-permalink to it.
+produces — design docs, test plans, unit test plans, test results,
+effort estimates, checkpoints, and learning extractions. GitHub issues
+have no attachment API, so the durable store is the repository itself,
+and the issue comment carries the content or a permalink to it.
 
-This one reference covers all four artifact kinds, parameterized by
+This one reference covers every artifact kind, parameterized by
 sentinel heading and path, because the resolution chain is
 structurally identical for each — Forge's own source material carries
 this as three near-duplicate files for exactly that reason, which is
@@ -29,13 +29,29 @@ the permalink when present.
 
 | Artifact | Sentinel | Path | Producer |
 |---|---|---|---|
-| Design doc | `## dev-lifecycle-design-doc` | `docs/design/{issue}-design.md` | `story-design` |
-| Test plan | `## dev-lifecycle-test-plan` | `docs/test-plans/{issue}-test-plan.md` | `story-test` (test-plan generation is not yet ported — see `AGENT.md`) |
-| Unit test plan | `## dev-lifecycle-unit-tests` | `docs/test-plans/{issue}-unit-tests.md` | not yet ported — see `AGENT.md` |
+| Design doc | `## dev-lifecycle-design-doc` | `docs/design/{issue}-design.md` | `story-design`, revised by `replan` |
+| Test plan | `## dev-lifecycle-test-plan` | `docs/test-plans/{issue}-test-plan.md` | `story-test-plan`, regrounded by `story-test-replan` |
+| Unit test plan | `## dev-lifecycle-unit-tests` | `docs/test-plans/{issue}-unit-tests.md` | `task-test-plan` |
 | Test results | `## dev-lifecycle-test-results` | `docs/test-results/{issue}-{timestamp}.md` | `task-test`, `story-test` |
+| Effort estimate | `## dev-lifecycle-effort-estimate` | comment only — no committed file | `size` |
+| Checkpoint | `## dev-lifecycle-checkpoint` | comment only — `PROGRESS-{issue}.md` is a local counterpart, not the artifact | `checkpoint`, read by `resume` |
+| Learning extraction | `## dev-lifecycle-kb-extraction` | `docs/knowledge/{subsystem}-{slug}.md` | `enhance-debugger` |
 
 The sentinel is the comment body's **first line** — not indented, not
 preceded by blank lines, not inside a code fence.
+
+**Three of these are comment-only.** The effort estimate and the
+checkpoint have no committed file, so the Resolution Chain below stops
+at Step 1 for them: there is no permalink to follow and no local
+fallback to find, and a reader that falls through to Step 3 for one of
+them has a bug, not a missing artifact. `enhance-debugger`'s articles
+are committed, but on a PR branch rather than the default branch, so
+they resolve from the PR until it merges.
+
+Every producer posts a **new** comment per run rather than editing the
+previous one, so the progression stays readable; consumers take the
+most recent by `createdAt` and the newest therefore wins with no
+cleanup step.
 
 ## Resolution Chain (reader side)
 

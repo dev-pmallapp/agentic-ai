@@ -169,7 +169,7 @@ no-op edit. After any operation whose result matters:
 | Did | Verify by |
 |---|---|
 | Created an issue | The command printed a URL; parse the number from it. No URL means no issue. |
-| Posted a comment | Re-fetch and scan for the sentinel (`References/gh-api.md` § Post-upload verification). |
+| Posted a comment | Re-fetch and scan for the sentinel (`References/artifact-resolution.md` § Upload Procedure, step 3). |
 | Changed labels | The next fetch shows the new label set — check it before reporting a transition. |
 | Created a PR | `gh pr view {n} --json state` returns `OPEN`. |
 
