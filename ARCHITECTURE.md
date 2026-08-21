@@ -164,9 +164,11 @@ issue/PR-driven development lifecycle. For that, and only that, the
 Forge plugin at `/home/pmallapp/tmp/gh-workflow` is the reference —
 specifically its agent split (`forge-planner` / `forge-coder` /
 `forge-validator`) over a milestone → story → task → PR hierarchy.
-`agents/dev-lifecycle/` is a placeholder marking that reservation.
-Nothing has been ported; Forge is untouched and stays an independent
-repo. A real port is future work.
+`agents/dev-lifecycle/` holds that port: six Skills, one Workflow, and
+five References covering requirements-to-review-ready-PR. Forge itself
+is untouched and stays an independent repo — content moves out of it in
+one direction only. What the port deliberately leaves out is recorded in
+`agents/dev-lifecycle/AGENT.md`.
 
 ## Layout
 
@@ -176,26 +178,37 @@ ai-agents/
   ARCHITECTURE.md
   CONTRIBUTING.md
   .claude-plugin/plugin.json      Claude Code plugin manifest
-  docs/design/1-scaffold.md       design note for this pass
+  docs/design/1-scaffold.md       design note for the scaffold pass
+  docs/porting-from-lifeos.md     the porting guide
   agents/
     stock-screening/
       AGENT.md
-      Skills/                      (empty)
-      Workflows/swing-trading.md
-      Workflows/day-trading-shortlist.md
-      References/                 (empty)
-      Tools/                      (empty)
+      Skills/swing-trading.md
+      Skills/day-trading-shortlist.md
+      References/                 data contract, universe, criteria
+      Tools/bhavcopy.py           NSE/BSE fetch, cache, normalise
+      Tools/screen.py             criteria application and ranking
+      Workflows/                  (empty by design)
     dev-lifecycle/
-      AGENT.md                    placeholder only
+      AGENT.md
+      Skills/                     6 skills ported from Forge
+      References/                 5 ported contracts
+      Workflows/autodev.md
+      Tools/                      (empty by design)
+    BiasCheck/  ExtractWisdom/  FirstPrinciples/  RootCauseAnalysis/
+      AGENT.md + Skills/          ported from LifeOS
   harness-adapters/
     claude-code/README.md
     cline/README.md
     gemini-cli/README.md
     qwen-code/README.md
   src/ai_agents/
-    __init__.py  catalog.py  tiers.py  install.py  cli.py
+    __init__.py  catalog.py  tiers.py  install.py  lifecycle.py
+    doctor.py  cli.py
   tests/
-    test_catalog.py  test_tiers.py
+    test_catalog.py  test_tiers.py  test_install.py
+    test_lifecycle.py  test_doctor.py
+    test_stock_screening_tools.py  fixtures/
   pyproject.toml
 ```
 
@@ -221,22 +234,25 @@ change to the agent catalog are separate tasks even when they ship the
 same feature; a change touching three files inside `src/ai_agents` is
 one.
 
-## What This Scaffold Does NOT Do Yet
+## What This Does NOT Do Yet
 
 Stated plainly so the scope is not overread:
 
-- **No harness adapter is wired.** All four `harness-adapters/*/README.md`
-  describe a contract; none generates anything.
-  `install.generate_harness_adapters` raises `NotImplementedError`.
-- **No agent workflow is authored.** Both `stock-screening`
-  `Workflows/*.md` files are `## TODO` outlines naming what a real
-  implementation needs. They contain no screening logic.
-- **No market-data integration exists.** No API, no MCP server, no
-  dataset, and no decision about which to use.
-- **Nothing is ported from LifeOS or Forge.** `agents/dev-lifecycle/`
-  is a one-file reservation.
-- **`ai-agents doctor` is a stub** that prints its planned checks.
+- **`stock-screening` is end-of-day only.** There is no live, intraday,
+  or pre-market data path, so `day-trading-shortlist` screens a
+  completed session for a named date rather than the one in progress.
+  Prices are unadjusted for corporate actions.
+- **Screening covers Indian equities only.** NSE and BSE, via public
+  exchange bhavcopy files. The series codes, circuit rules and delivery
+  data it relies on do not generalise to other markets.
+- **No external plugin installation.** The bend-first rule means
+  anything that cannot fit the agent anatomy installs project-locally
+  instead; that path is not built.
+- **No packaging or CI.** The catalog is read off a tier root on disk,
+  not shipped as package data, so a non-editable install has no
+  `agents/` tree to read. Milestone 4 covers this.
 
-What does work: `catalog.list_agents`, `tiers.resolve`,
-`install.copy_agent`, and the `list` / `init` / `install` CLI commands
-over them.
+What works: the catalog, tier resolution, `install` / `list` / `init`,
+the lifecycle operations (`diff` / `update` / `remove`), `doctor`,
+harness adapter generation for all four harnesses, the LifeOS and Forge
+agent ports, and both stock screens.
