@@ -68,12 +68,47 @@ Multiple installed agents mean one combined block, not multiple files
 BEGIN/END markers. Entries are ordered alphabetically by agent name, so
 the generated block is deterministic and diffs cleanly between runs.
 
+## Hooks
+
+**No hook mechanism is targeted by this adapter, and none is
+assumed.** Same position as the Gemini CLI adapter, and for the same
+reason: what this adapter targets is the `QWEN.md` context-file shape,
+and a context file is read, not run. None of the six hooks in
+`agents/dev-lifecycle/References/hook-contract.md` is honored by the
+generated block. The inherited extension manifest is out of scope
+here exactly as it is there, and is not guessed at.
+
+This is one of the places the two forks are assumed to still agree.
+That assumption is worth flagging rather than burying — the adapters
+are kept separate precisely because the forks are free to diverge, so
+if Qwen Code grows an event mechanism Gemini CLI does not have (or the
+reverse), this section changes independently of that one.
+
+Fallbacks, per that contract:
+
+| Contract hook | Fallback here |
+|---|---|
+| `check-commit-prefix` | git `commit-msg` hook |
+| `issue-link-commit` | git `post-commit` hook |
+| `session-start` | run `status` at the start of a session |
+| `detect-workflow-prompt` | `AGENT.md` § Routing, which the agent consults anyway |
+| `auto-save-progress` | run `checkpoint` before stopping |
+| `pre-compact` | re-read `PROGRESS-{issue}.md`; every Skill is resumable from it |
+
+The two git hooks are the real recovery and are undiminished here,
+since they run at the git layer and never see the harness. The other
+four degrade to conventions the user invokes — lost timing, not lost
+capability.
+
 ## Verification
 
 This format is derived from the discovery mechanism described above —
 `QWEN.md` as a single hierarchically-loaded context file, inherited
 from the Gemini CLI fork it mirrors — and not from a live install of
 Qwen Code against a generated block. Unverified against a live install.
+The same applies to the hook position, with the added caveat that it
+is inherited from the Gemini CLI adapter rather than separately
+established.
 
 Status: format specified and generated. See
 `install.generate_harness_adapters`; this harness is detected by a

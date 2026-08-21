@@ -65,12 +65,51 @@ others. There is no combined block and no ordering concern, since
 Claude Code dispatches per file on `description` match rather than
 reading them as one document.
 
+## Hooks
+
+Claude Code is the **only** one of the four harnesses with an event
+hook mechanism this repo can point at concretely, and it can honor all
+six hooks in `agents/dev-lifecycle/References/hook-contract.md`.
+Registration is a `hooks.json`: a map from event name to a list of
+matchers, each carrying shell commands that receive the event as JSON
+on stdin. A plugin ships its own at `hooks/hooks.json` and refers to
+its files through `${CLAUDE_PLUGIN_ROOT}`.
+
+| Contract hook | Event | Matcher |
+|---|---|---|
+| `check-commit-prefix` | `PreToolUse` | the shell tool |
+| `issue-link-commit` | `PostToolUse` | the shell tool |
+| `session-start` | `SessionStart` | — |
+| `detect-workflow-prompt` | `UserPromptSubmit` | `*` |
+| `auto-save-progress` | `Stop` | `*` |
+| `pre-compact` | `PreCompact` | — |
+
+That mapping is not inferred: the source material this contract is
+ported from registers exactly these six scripts against exactly these
+six events, in a working plugin. It is the one part of any adapter in
+this repo backed by a real artifact rather than by reading docs.
+
+**Not generated.** `install.generate_harness_adapters` writes agent
+pointers and nothing else — no `hooks.json`, no scripts, on this
+harness or any other. The contract is a specification; a project that
+wants these behaviors registers them itself, and the table above is
+what to register them against. The two git-hook-deliverable hooks
+(`check-commit-prefix` as `commit-msg`, `issue-link-commit` as
+`post-commit`) are worth preferring even here, since they also cover
+commits made outside Claude Code.
+
+Note the invariant the contract states for `check-commit-prefix`: a
+`PreToolUse` hook here can block a tool call, and must not. Advisory
+output only. The blocking expression is the git one.
+
 ## Verification
 
 This format is derived from the discovery mechanism described above —
 frontmatter-driven subagent dispatch under `.claude/agents/*.md` — and
 not from a live install of Claude Code against a generated pointer.
-Unverified against a live install.
+Unverified against a live install. The hook mapping is the exception:
+it is transcribed from a working `hooks.json` in the source material,
+not derived.
 
 Status: format specified and generated. See
 `install.generate_harness_adapters`; this harness is detected by the

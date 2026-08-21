@@ -54,12 +54,52 @@ directory unconditionally, so this is the one harness where adding an
 agent has a fixed context cost on every request, which is exactly why
 each file stays this short.
 
+## Hooks
+
+**No hook mechanism is targeted by this adapter, and none is
+assumed.** What this adapter targets is `.clinerules/` — markdown
+loaded into context — and a rules file is not an event mechanism. It
+cannot run at session start, cannot inspect a command before it is
+run, and cannot fire before a commit. It can only state something the
+model reads. So none of the six hooks in
+`agents/dev-lifecycle/References/hook-contract.md` is honored by the
+generated artifact.
+
+Fallbacks, per that contract:
+
+| Contract hook | Fallback here |
+|---|---|
+| `check-commit-prefix` | git `commit-msg` hook |
+| `issue-link-commit` | git `post-commit` hook |
+| `session-start` | run `status` at the start of a session |
+| `detect-workflow-prompt` | `AGENT.md` § Routing, which the agent consults anyway |
+| `auto-save-progress` | run `checkpoint` before stopping |
+| `pre-compact` | re-read `PROGRESS-{issue}.md`; every Skill is resumable from it |
+
+The two git hooks are the real recovery. They work here exactly as
+well as on a harness with a full hook system, because they run at the
+git layer and never see the harness at all — which is precisely why
+the contract prefers them.
+
+The four convention fallbacks are a better fit on this harness than
+most, since `.clinerules/` is loaded unconditionally on every request:
+a project that wants "run `status` first, `checkpoint` last" can state
+that as a rule and have it present in context every time. That is a
+convention the model may follow, not a guarantee something fires — the
+distinction the contract's degradation notes are about, and it should
+not be described as hook support.
+
+If Cline gains an event mechanism, this section is where it gets
+recorded, and only then.
+
 ## Verification
 
 This format is derived from the discovery mechanism described above —
 Cline loading every file under `.clinerules/` into context — and not
 from a live install of Cline against a generated pointer. Unverified
-against a live install.
+against a live install. The same applies to the hook position: it
+describes what this adapter targets, and no claim is made about
+mechanisms outside that.
 
 Status: format specified and generated. See
 `install.generate_harness_adapters`; this harness is detected by the

@@ -66,12 +66,52 @@ Multiple installed agents mean one combined block, not multiple files
 BEGIN/END markers. Entries are ordered alphabetically by agent name, so
 the generated block is deterministic and diffs cleanly between runs.
 
+## Hooks
+
+**No hook mechanism is targeted by this adapter, and none is
+assumed.** This adapter targets the `GEMINI.md` context-file shape,
+stated at the top of this document, and a context file is not an event
+mechanism — it is read, not run. So none of the six hooks in
+`agents/dev-lifecycle/References/hook-contract.md` is honored by the
+generated block.
+
+The extension mechanism (`gemini-extension.json`) is the other thing
+Gemini CLI offers, and this adapter already declares it out of scope —
+a separate contract this repo does not use. Whether it can carry
+lifecycle hooks is therefore not a question this document answers, and
+it is deliberately not guessed at: the honest statement is that
+nothing in the shape this adapter targets is an event hook.
+
+Fallbacks, per that contract:
+
+| Contract hook | Fallback here |
+|---|---|
+| `check-commit-prefix` | git `commit-msg` hook |
+| `issue-link-commit` | git `post-commit` hook |
+| `session-start` | run `status` at the start of a session |
+| `detect-workflow-prompt` | `AGENT.md` § Routing, which the agent consults anyway |
+| `auto-save-progress` | run `checkpoint` before stopping |
+| `pre-compact` | re-read `PROGRESS-{issue}.md`; every Skill is resumable from it |
+
+The two git hooks are the real recovery, and they are undiminished
+here: they run at the git layer and never see the harness, which is
+why the contract prefers them everywhere. The other four degrade to
+conventions the user invokes — they are not lost capabilities, only
+lost timing, because every Skill in `dev-lifecycle` is resumable from
+GitHub and progress-file state alone.
+
+If a hook mechanism is established for this harness — in the extension
+manifest or elsewhere — this section is where it gets recorded, and
+only then.
+
 ## Verification
 
 This format is derived from the discovery mechanism described above —
 `GEMINI.md` as a single hierarchically-loaded context file that humans
 also hand-edit — and not from a live install of Gemini CLI against a
-generated block. Unverified against a live install.
+generated block. Unverified against a live install. The same applies
+to the hook position: it describes what this adapter targets, and no
+claim is made about mechanisms outside that.
 
 Status: format specified and generated. See
 `install.generate_harness_adapters`; this harness is detected by a
