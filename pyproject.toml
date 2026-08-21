@@ -4,7 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ai-agents"
-version = "0.1.0"
+# Read from src/ai_agents/__init__.py — see [tool.hatch.version] below.
+# One number in one place: `ai-agents --version` and the distribution
+# metadata cannot disagree, because there is nothing to keep in sync.
+dynamic = ["version"]
 description = "Cross-harness catalog of agents and their workflows, with multi-level installation"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -17,6 +20,13 @@ ai-agents = "ai_agents.cli:cli"
 
 [dependency-groups]
 dev = ["pytest>=8.0"]
+
+# The single source of truth for the version. `__version__` in the package
+# is what `ai-agents --version` prints and what the CLI has always read;
+# making the build derive the distribution version from it means the bump
+# in CONTRIBUTING.md's release sequence touches exactly one line.
+[tool.hatch.version]
+path = "src/ai_agents/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ai_agents"]
