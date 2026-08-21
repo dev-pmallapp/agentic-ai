@@ -732,8 +732,8 @@ def render_swing(result: dict, env: dict, criteria: dict, universe: dict) -> str
     )
     out += ["", f"{'#':>3}  {'SYMBOL':<12} {'EX':<4} {'CLOSE':>9} "
             f"{'>SMA50':>7} {'<HIGH':>6} {'VOLx':>5} {'ATR%':>5} "
-            f"{'DELIV':>6} {'TURNOVER':>10} {'SIGNALS':<22} SCORE"]
-    out.append("  " + "-" * 110)
+            f"{'DELIV':>6} {'TURNOVER':>10} {'SIGNALS':<24} SCORE"]
+    out.append("  " + "-" * 112)
     for index, row in enumerate(result["candidates"], 1):
         mark = "*" if row["delivery_partial"] else " "
         signals = ",".join(row.get("signals") or []) or "-"
@@ -742,7 +742,7 @@ def render_swing(result: dict, env: dict, criteria: dict, universe: dict) -> str
             f"{row['close']:>9,.2f} {row['pct_above_sma_long']:>6.1f}% "
             f"{row['pct_below_high']:>5.1f}% {row['volume_ratio']:>5.2f} "
             f"{row['atr_pct']:>5.2f} {row['delivery_pct']:>5.1f}{mark} "
-            f"{_rupees(row['median_turnover']):>10} {signals:<22} "
+            f"{_rupees(row['median_turnover']):>10} {signals:<24} "
             f"{row['score']:.3f}"
         )
     if any(r["delivery_partial"] for r in result["candidates"]):
