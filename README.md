@@ -21,12 +21,50 @@ cascade as `git config`.
 
 ---
 
+## Install
+
+**The catalog ships inside the package.** `init` copies from the installed
+package, not from a checkout — so it needs no clone, no network, and no
+git, and the agents you get are exactly the ones the installed version's
+parser was written to read. The trade is that a catalog edit reaches you in
+a release rather than the moment it lands on `main`; see
+[`docs/design/2-catalog-distribution.md`](docs/design/2-catalog-distribution.md)
+for why that trade was taken, and `--source` below for the way around it.
+
+```bash
+pipx install ai-agents          # or: uv tool install ai-agents
+```
+
+> **Not on PyPI yet** — the first release is tracked by #44. Until it
+> lands, install straight from the repo, which still needs no checkout:
+>
+> ```bash
+> pipx install git+https://github.com/dev-pmallapp/agentic-ai
+> ```
+
+### Developer install
+
+Only if you are working *on* this repo rather than using it:
+
+```bash
+git clone https://github.com/dev-pmallapp/agentic-ai
+cd agentic-ai
+pip install -e .
+```
+
+An editable install has no bundled catalog — the build step that embeds it
+never runs — so `init` falls back to the `agents/` tree in your checkout.
+That is deliberate: edit an agent, and `init` picks it up with no rebuild.
+`ai-agents init --source /path/to/checkout` seeds from a named checkout
+instead, which is also how you get a catalog newer than your installed
+version without waiting for a release.
+
+---
+
 ## Quick start
 
 ```bash
-pip install -e .
-
-ai-agents init                          # seed ~/.ai-agents from this repo
+ai-agents init                          # seed ~/.ai-agents from the installed catalog
 ai-agents list                          # what's in the master catalog
 
 cd ~/code/some-repo
@@ -121,9 +159,10 @@ exit code is non-zero only when something is reported as broken (`FAIL`).
 
 | Path | Holds |
 |---|---|
-| `agents/<name>/AGENT.md` | Persona and a routing table to the agent's workflows |
-| `agents/<name>/workflows/*.md` | The procedures themselves |
-| `agents/<name>/references/`, `tools/` | Shared contracts; scripts the agent shells out to |
+| `agents/<Name>/AGENT.md` | Persona and a routing table over the agent's skills and workflows |
+| `agents/<Name>/Skills/*.md` | Atomic procedures, each individually invocable |
+| `agents/<Name>/Workflows/*.md` | Cumulative procedures that compose Skills and own the gates between them |
+| `agents/<Name>/References/`, `Tools/` | Shared contracts; scripts the agent shells out to |
 | `harness-adapters/<harness>/` | How one harness discovers instructions, and what its pointer files will look like |
 | `src/ai_agents/` | The CLI — catalog, tier resolution, copying |
 | `docs/design/` | Numbered design notes, one per pass |
@@ -144,9 +183,9 @@ Known limits:
 - `stock-screening` covers **Indian equities only** (NSE and BSE) and is
   **end-of-day only** — there is no live or intraday path, so the
   day-trading screen reviews a completed session for a named date.
-- No packaging or CI yet. The catalog is read off a tier root on disk
-  rather than shipped as package data, so a non-editable install has no
-  `agents/` tree to read.
+- Not published to a package index yet, so the `pipx install ai-agents`
+  above does not resolve until the first release (#44). Installing from
+  the repo URL works today and takes the same bundled catalog.
 
 See `ARCHITECTURE.md` for the design and the full list of what this does
 not do yet, and `CONTRIBUTING.md` for how to add an agent.
