@@ -31,10 +31,53 @@ ai-agents list                          # what's in the master catalog
 
 cd ~/code/some-repo
 ai-agents install stock-screening --project
+
+ai-agents diff stock-screening --project      # what would change on update?
+ai-agents update stock-screening --project    # refresh from the master copy
+ai-agents remove stock-screening --project    # drop it, and its pointers
 ```
 
 `init` and `install` never overwrite. An agent already present is left
-alone — refreshing means removing it first.
+alone — refreshing means removing it first, which is exactly what `update`
+does for you, with a safety check `install` doesn't need.
+
+---
+
+## Maintaining an installed agent
+
+`install` is intentionally one-shot: copy when absent, never touch when
+present. Once an agent is installed, three more commands manage it —
+`update`, `diff`, and `remove` — each taking the same `--project` (default)
+/ `--workspace` flag `install` does, and each always comparing against (or
+refreshing from) the user master tier, the same source `install` copies
+from.
+
+| Command | Does | Mutates? |
+|---|---|---|
+| `ai-agents diff NAME [--project\|--workspace]` | Reports drift between the installed copy and the master: files changed, missing locally, or added locally. | Never. Read-only, always — safe to run before every `update`. |
+| `ai-agents update NAME [--project\|--workspace] [--force]` | Refreshes the installed copy from the master (delete, then recopy). | Refuses if the installed copy has diverged from the master, unless `--force` is given — a diverged copy may hold edits made on purpose. |
+| `ai-agents remove NAME [--project\|--workspace]` | Deletes the agent directory from the tier, and the harness pointer files `install` generated for it. | Deletes. A pointer a person hand-authored (no `ai-agents`-generated marker in it) is left alone rather than deleted, even if it occupies the exact path a pointer would use. |
+
+**What counts as "diverged".** Every file under the installed agent
+directory and its master counterpart is compared byte-for-byte by its
+relative path — a file only one side has, or a file both sides have with
+different content, both count. mtimes and permissions are never
+consulted. This is a strict, symmetric definition on purpose: it is what
+lets `update` refuse to silently delete a locally-added file, or silently
+resurrect a locally-deleted one, not only to protect a file both sides
+already share.
+
+**What happens to a harness's shared context file on removal.** Claude
+Code and Cline get one pointer file per agent, so removing an agent just
+deletes its file outright (when `ai-agents` generated it). Gemini CLI and
+Qwen Code instead share one managed block across every agent installed at
+a tier — `GEMINI.md` / `QWEN.md` — so removing one agent re-renders that
+block from whichever agents are left. When the removed agent was the last
+one at that tier, the block is deleted in full (not left standing as an
+empty "## AI Agents" heading with nothing under it), and if the file held
+nothing but that block, the file itself is deleted too — a tier with
+nothing installed looks the same whether or not it ever had anything
+installed. Hand-written text elsewhere in the file is always left alone.
 
 ---
 
