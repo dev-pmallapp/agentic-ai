@@ -163,3 +163,16 @@ Story: Open → In Progress (step 3), on invocation.
   force-switch or reset.
 - **Push rejected (non-fast-forward):** someone advanced the story
   branch. Stop and report — do not merge or rebase unasked.
+
+## Templates
+
+`Templates/design-doc.md` is the shape of the document this Skill
+writes. Use it rather than composing sections ad hoc — `task-create`
+reads the `## Build Targets` table out of the result by column name,
+so that table's heading and columns are fixed even though the prose
+around them is not.
+
+The template holds the *shape*; the rules for filling it are step 5
+above. Where the two appear to disagree, this Skill wins: the section
+order, the per-section approval rounds, and the build-target selection
+rule are procedure, and the template only says where the output goes.

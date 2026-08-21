@@ -69,8 +69,8 @@ Fallbacks, per that contract:
 
 | Contract hook | Fallback here |
 |---|---|
-| `check-commit-prefix` | git `commit-msg` hook |
-| `issue-link-commit` | git `post-commit` hook |
+| `check-commit-prefix` | git `commit-msg` hook — **shipped**, `Templates/git-commit-msg-hook.sh` |
+| `issue-link-commit` | git `post-commit` hook — specified, not shipped |
 | `session-start` | run `status` at the start of a session |
 | `detect-workflow-prompt` | `AGENT.md` § Routing, which the agent consults anyway |
 | `auto-save-progress` | run `checkpoint` before stopping |

@@ -223,8 +223,13 @@ learning in step 5, not a high one, however well-written it reads.
 ## Templates
 
 `Templates/kb-article.md` gives KB articles their fixed shape and is
-**not yet ported** — it lands with the rest of the scaffolding
-templates (milestone-3 task **#32**). Until then, generate articles
-with the sections named in step 4 (observable, actual cause, how it was
-distinguished, fix, citations, confidence) and say that the canonical
-template was unavailable.
+**present**. Generate every article from it.
+
+Its frontmatter is what makes an article findable later, so fill it
+even where a value looks obvious from the body — `error_patterns` and
+`related_commands` especially. Error strings are matched verbatim by a
+future search, so paraphrasing one destroys its value.
+
+The `confidence` field in the frontmatter and the `## Confidence`
+section must agree; the rule in this Skill decides both, and an RCA
+marked as a hypothesis is **low** however well-written it reads.

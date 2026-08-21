@@ -146,21 +146,17 @@ documents its own deltas in a `## Bug Mode` section.
 ## What's Ported and What Isn't
 
 This port now covers **all of Forge's lifecycle surface**: 17 Skills,
-6 Workflows, 10 References — bootstrap, requirements, design, test
-plans, implementation, validation, close-out, the bug track, and
-orchestration in three modes.
+6 Workflows, 10 References, 7 Templates — bootstrap, requirements,
+design, test plans, implementation, validation, close-out, the bug
+track, and orchestration in three modes.
 
-It got there in four passes: story #9 ported the first 6 Skills and
+It got there in five passes: story #9 ported the first 6 Skills and
 `autodev`; task **#28** added the remaining 10 Skills; task **#29**
 added the bug track and the orchestration layer; task **#30** added
-the hook contract.
+the hook contract; task **#32** added the Templates.
 
-Deliberately **not** ported, and tracked as milestone-3 tasks:
+Deliberately **not** ported:
 
-- **The scaffolding templates** (`Templates/`) — `init` and
-  `enhance-debugger` cite `Templates/ARCHITECTURE.md`,
-  `Templates/CONTRIBUTING.md` and `Templates/kb-article.md` by path,
-  and degrade explicitly where they are absent. Task **#32**.
 - **A Projects v2 board mirror and gh rate-limit backoff** — see
   `References/gh-operations.md` § Out of Scope for This Port.
 
@@ -277,6 +273,47 @@ Skill and Reference — any harness's shell-equivalent tool already runs
 it directly. `Tools/` becomes worth filling only if a future need
 appears that plain `gh`/`git` invocations cannot express (structured
 JSON post-processing beyond `--jq`, for instance) — not before.
+
+## Templates
+
+Seven documents this agent writes **into a user's project**, as
+opposed to `References/`, which are contracts it reads. Both are cited
+by Skills; neither is owned by one.
+
+| Template | Written by | Fixed shape |
+|---|---|---|
+| `Templates/ARCHITECTURE.md` | `init` | `## Build Targets` — heading and columns |
+| `Templates/CONTRIBUTING.md` | `init` | `## Commands` — heading and columns |
+| `Templates/design-doc.md` | `story-design` | `## Build Targets`, read by `task-create` |
+| `Templates/test-plan.md` | `story-test-plan` | `### <Category>` headings, case-number column |
+| `Templates/test-case.md` | `story-test-plan` | frontmatter, `pass_criteria` above all |
+| `Templates/kb-article.md` | `enhance-debugger` | frontmatter, `error_patterns` verbatim |
+| `Templates/git-commit-msg-hook.sh` | nobody — **the user installs it** | — |
+
+**The fixed shapes are the point.** Each of those sections is located
+by exact heading text and read by column name. Renaming a heading or
+turning a table into prose does not raise an error; it degrades
+silently, and discovery falls back to guessing from the filesystem
+with nothing announcing that it did. Every template states its own
+contract inline, in an HTML comment, so a user editing the document
+six months later sees the warning without reading this agent. Preserve
+those comments when writing a file — they are the warning, not
+decoration.
+
+The split against `References/`: a Reference is a contract this agent
+reads to decide what to do; a Template is a shape it writes, or a file
+a user installs. That is why `git-commit-msg-hook.sh` is here and not
+in `Tools/` — `Tools/` is code *this agent runs* and stays empty, as
+above, while the hook is a file the user copies into their own clone.
+It is bash rather than Python for the same reason: it runs on every
+commit in someone else's repository and must add no interpreter
+dependency. The Python-first rule governs `Tools/`.
+
+**This agent never installs the hook.** `.git/hooks/` is per-clone and
+untracked, so writing there would change a user's repository uninvited
+— see `References/hook-contract.md` § The Git-Hook Subset.
+`Templates/CONTRIBUTING.md` carries the instructions, in both the
+`.git/hooks/` and the version-controlled `core.hooksPath` forms.
 
 ## Boundaries
 

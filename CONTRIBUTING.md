@@ -10,6 +10,8 @@ agents/<Name>/
   Skills/*.md           optional — atomic, individually invocable
   Workflows/*.md        optional — cumulative, compose Skills
   References/*.md       optional — shared contracts, cited by both
+  Templates/*           optional — shapes the agent writes into a
+                                   user's project
   Tools/*               optional — scripts the agent shells out to
 ```
 
