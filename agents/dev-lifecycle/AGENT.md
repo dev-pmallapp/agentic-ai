@@ -20,6 +20,9 @@ skills:
   - enhance-debugger
 workflows:
   - autodev
+  - planner
+  - coder
+  - validator
 ---
 
 # dev-lifecycle
@@ -86,9 +89,22 @@ a fixed position in the run:
 | Skill | **checkpoint** | Work is being handed off or paused, and the state that isn't in git needs recording | `Skills/checkpoint.md` |
 | Skill | **resume** | Picking up an issue that has a checkpoint, whether someone else's or your own | `Skills/resume.md` |
 
+**Orchestration** — cumulative runs that compose the Skills above:
+
 | Kind | Name | Trigger | File |
 |---|---|---|---|
 | Workflow | **autodev** | Run the whole pipeline — or a whole Story's slice of it — with as few manual invocations as possible | `Workflows/autodev.md` |
+| Workflow | **planner** | Take a milestone or Story from requirements to designed, sized, test-planned, and split into tasks | `Workflows/planner.md` |
+| Workflow | **coder** | Take one task from Open to Resolved — implement, generate unit tests, run them, leave a PR ready | `Workflows/coder.md` |
+| Workflow | **validator** | Every task on a Story is resolved and it needs its plan regrounded, run, and a verdict returned | `Workflows/validator.md` |
+
+`planner`, `coder`, and `validator` are the three **worker roles**.
+`autodev` composes them; each is also invocable directly when you want
+one phase of the pipeline without the rest. They are Workflows rather
+than harness agent definitions on purpose — a role can run in an
+isolated subagent where the harness has one, or inline in the main
+session where it does not, with no change to its steps or its output
+contract. See `Workflows/autodev.md` § Running the Workers.
 
 Sixteen Skills. The pipeline runs `init` once per project, then
 `story-create` → `story-design` → `story-test-plan` → `task-create` →

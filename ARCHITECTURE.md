@@ -73,9 +73,19 @@ gates along the way. `References/*.md` and `Tools/*` are shared by both
 kinds; neither owns them.
 
 The composition rule runs one direction only: a Workflow may compose
-Skills; a Skill never depends on a Workflow. `AGENT.md`'s routing table
-points to both kinds directly, but nothing under `Skills/` is allowed to
-assume a `Workflows/` file already ran.
+Skills, **and may compose other Workflows**; a Skill never depends on a
+Workflow. `AGENT.md`'s routing table points to both kinds directly, but
+nothing under `Skills/` is allowed to assume a `Workflows/` file already
+ran.
+
+Workflow-composes-Workflow is allowed because it does not touch the
+guarantee below: the inner Workflow, like a Skill, stays directly
+invocable on its own. Only the *upward* dependency is forbidden.
+`dev-lifecycle` uses this — `autodev` composes the `planner`, `coder`,
+and `validator` role Workflows, each of which composes Skills — and it
+is what lets a role run either as an isolated subagent or inline in the
+main session, unchanged, on harnesses that differ in whether they have
+a subagent primitive at all.
 
 That rule buys a specific guarantee: every step of a cumulative run
 stays directly invocable on its own. If a workflow stalls partway

@@ -56,7 +56,13 @@ def test_dev_lifecycle_has_the_ported_skills_and_workflow():
         "checkpoint",
         "resume",
     }
-    assert dev_lifecycle["workflows"] == ["autodev"]
+    assert set(dev_lifecycle["workflows"]) == {
+        "autodev",
+        # the three worker roles autodev composes — story #24, task #29
+        "planner",
+        "coder",
+        "validator",
+    }
     assert catalog.find_dangling_skill_refs(dev_lifecycle) == []
 
 
