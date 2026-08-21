@@ -146,13 +146,14 @@ documents its own deltas in a `## Bug Mode` section.
 ## What's Ported and What Isn't
 
 This port now covers **all of Forge's lifecycle surface**: 17 Skills,
-6 Workflows, 9 References — bootstrap, requirements, design, test
+6 Workflows, 10 References — bootstrap, requirements, design, test
 plans, implementation, validation, close-out, the bug track, and
 orchestration in three modes.
 
-It got there in three passes: story #9 ported the first 6 Skills and
+It got there in four passes: story #9 ported the first 6 Skills and
 `autodev`; task **#28** added the remaining 10 Skills; task **#29**
-added the bug track and the orchestration layer.
+added the bug track and the orchestration layer; task **#30** added
+the hook contract.
 
 Deliberately **not** ported, and tracked as milestone-3 tasks:
 
@@ -160,13 +161,11 @@ Deliberately **not** ported, and tracked as milestone-3 tasks:
   `enhance-debugger` cite `Templates/ARCHITECTURE.md`,
   `Templates/CONTRIBUTING.md` and `Templates/kb-article.md` by path,
   and degrade explicitly where they are absent. Task **#32**.
-- **Lifecycle hooks** — Forge's 7 hooks have no expression here yet.
-  Tasks **#30** and **#31**.
 - **A Projects v2 board mirror and gh rate-limit backoff** — see
   `References/gh-operations.md` § Out of Scope for This Port.
 
-Two things are ported **deliberately differently** rather than
-omitted, and both are recorded where they apply:
+Three things are ported **deliberately differently** rather than
+omitted, and all three are recorded where they apply:
 
 - **The worker roles are Workflows, not harness agent definitions** —
   see `## Routing` and `Workflows/autodev.md` § Running the Workers.
@@ -176,6 +175,16 @@ omitted, and both are recorded where they apply:
   allows it on an explicit request; `## Boundaries` here admits no
   exception. See `Workflows/bug-fix.md` step 7 for why a bug fix is
   the worst place to make one.
+- **The lifecycle hooks are a contract, not scripts.** Forge's six
+  hook scripts and their `hooks.json` are ported as
+  `References/hook-contract.md` — what each guarantees, and what is
+  lost where it cannot fire — because the four target harnesses share
+  no hook mechanism and some have none. Per-harness support is stated
+  in `harness-adapters/*/README.md` § Hooks. **Nothing here ships an
+  executable hook**, so treat every guarantee in that document as a
+  specification rather than as something currently firing; two of the
+  six are deliverable as plain git hooks, which a project installs
+  itself.
 
 If a request needs something in the first list, say so plainly and
 point at the relevant task rather than attempting a partial version of
@@ -207,6 +216,7 @@ lives once in `References/` and is cited by path:
 | `References/build-systems.md` | Build-target detection per language, and why the declared table beats filesystem discovery |
 | `References/project-commands.md` | Where build/test/lint commands live, their placeholders, and their pass criteria |
 | `References/sizing-criteria.md` | T-shirt sizing at task, Story, and Epic level, and the data-limited estimate |
+| `References/hook-contract.md` | What each lifecycle hook guarantees, independent of any harness mechanism, and what is lost where it cannot fire |
 
 One contract deliberately lives in a Skill rather than a Reference: the
 **label set** — names, colours, descriptions — is a table in
@@ -217,10 +227,10 @@ repair, and `References/workflow-states.md` treats the labels as given.
 
 ### Source-to-reference mapping
 
-The source material carries **13** reference files; this port has
-**9**. Nothing is dropped — five of the source files describe one
-contract each and collapse into two. The mapping, so the correspondence
-is auditable rather than assumed:
+The source material carries **13** reference files; nine References
+here correspond to them. Nothing is dropped — five of the source files
+describe one contract each and collapse into two. The mapping, so the
+correspondence is auditable rather than assumed:
 
 | Source reference | Ported to |
 |---|---|
@@ -245,6 +255,13 @@ when the chain changes — which is precisely the drift `References/`
 exists to prevent. `unit-test-resolution`'s extra git-history step is
 genuinely unique and survives as its own step rather than being flattened
 away.
+
+The tenth Reference, `hook-contract.md`, has **no row in this table on
+purpose** — it is not ported from a source reference at all. Its
+source is the `hooks/` directory: six shell scripts and a
+`hooks.json`, which is executable content rather than a contract
+document. Turning it into one is task #30's whole substance, so it
+belongs in the References count and outside this mapping.
 
 This mirrors two things already decided elsewhere: the source
 material's own stated principle ("References hold the contracts,
