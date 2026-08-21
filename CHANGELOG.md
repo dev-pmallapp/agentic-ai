@@ -47,6 +47,23 @@ ISIN is the join key rather than the ticker. Screening criteria live in
 `References/` as parameter tables read at run time, so a threshold is
 edited in a readable document rather than in code.
 
+Three Skills and one Workflow. `swing-trading` and
+`day-trading-shortlist` screen on price, volume and delivery, and name
+the setup each candidate shows — breakout, cross, pullback, extended —
+as classification that never changes who passes. `fundamental-gate`
+tests named stocks on valuation, growth, margins and returns, merging
+four providers first-hit-wins per field with the source of every number
+recorded. `morning-shortlist` is the daily pre-open run that sequences
+the two and returns ten.
+
+The gate runs **after** the technical screen, and that ordering is the
+design rather than an optimisation: fundamentals are fetched only for
+the few dozen names that already passed, not for the whole liquid
+universe. A missing fundamental is **unknown** — never zero, and never a
+pass. A rule whose field is unknown is not evaluated, and a name knowing
+too few fields is reported as not gateable rather than folded in either
+direction.
+
 **The catalog ships as package data.** `agents/` is force-included into
 the wheel, so `ai-agents init` works on a non-editable install with no
 checkout, no network, and no git. Reasoning in
@@ -69,7 +86,18 @@ settling in quietly. `doctor` reports what a tier carries.
 - Not published to a package index; `pipx install ai-agents` does not
   resolve yet. Installing from the repo URL does.
 - `stock-screening` is Indian equities only and end-of-day only — there
-  is no live or intraday path.
+  is no live or intraday path, so the morning shortlist screens the
+  previous session's close.
+- Three of the four fundamental providers are commercial sites with
+  unversioned pages that can change without notice. They fail loudly
+  rather than half-parsing, and the exchange's own filings are kept as a
+  credential-free floor — but the exchange feed is also the *stalest*
+  source, so a run that degrades to it alone is marked stale rather than
+  presented as current.
+- `debt_equity`, `promoter_holding` and `promoter_pledge` are gated but
+  have no provider yet, so those filters are written and not yet biting.
+- NSE lists ETFs in series `EQ`, so they are not excluded from the
+  equity universe (#86).
 
 [Unreleased]: https://github.com/dev-pmallapp/agentic-ai/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/dev-pmallapp/agentic-ai/releases/tag/v0.1.0

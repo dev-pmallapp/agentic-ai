@@ -1,0 +1,13 @@
+{
+  "name": "ai-agents-marketplace",
+  "description": "Local marketplace serving the ai-agents plugin from this repo",
+  "owner": {
+    "name": "ai-agents"
+  },
+  "plugins": [
+    {
+      "name": "ai-agents",
+      "source": "./"
+    }
+  ]
+}

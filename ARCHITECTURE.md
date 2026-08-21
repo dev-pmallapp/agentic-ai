@@ -278,6 +278,7 @@ ai-agents/
   ARCHITECTURE.md
   CONTRIBUTING.md
   .claude-plugin/plugin.json      Claude Code plugin manifest
+  .claude-plugin/marketplace.json  local marketplace serving this repo
   docs/design/1-scaffold.md       design note for the scaffold pass
   docs/porting-from-lifeos.md     the porting guide
   agents/
@@ -285,10 +286,12 @@ ai-agents/
       AGENT.md
       Skills/swing-trading.md
       Skills/day-trading-shortlist.md
-      References/                 data contract, universe, criteria
+      Skills/fundamental-gate.md
+      Workflows/morning-shortlist.md  screen, then gate, then ten
+      References/                 data contracts, universe, criteria
       Tools/bhavcopy.py           NSE/BSE fetch, cache, normalise
       Tools/screen.py             criteria application and ranking
-      Workflows/                  (empty by design)
+      Tools/fundamentals.py       fundamentals across four providers
     dev-lifecycle/
       AGENT.md
       Skills/                     17 Skills ported from Forge
@@ -309,7 +312,7 @@ ai-agents/
   tests/
     test_catalog.py  test_tiers.py  test_install.py
     test_lifecycle.py  test_doctor.py  test_plugins.py
-    test_stock_screening_tools.py  fixtures/
+    test_stock_screening_tools.py  test_fundamentals.py  fixtures/
   pyproject.toml
 ```
 
@@ -371,8 +374,23 @@ Stated plainly so the scope is not overread:
 
 - **`stock-screening` is end-of-day only.** There is no live, intraday,
   or pre-market data path, so `day-trading-shortlist` screens a
-  completed session for a named date rather than the one in progress.
-  Prices are unadjusted for corporate actions.
+  completed session for a named date rather than the one in progress,
+  and `morning-shortlist` screens the previous session's close. Prices
+  are unadjusted for corporate actions.
+- **Three of the four fundamental providers are not contracts.**
+  screener.in, tickertape.in and moneycontrol.com are commercial sites
+  whose HTML and internal JSON are unversioned and can change without
+  notice. Each provider fails loudly rather than half-parsing, and the
+  exchange's own filings are kept as a credential-free floor beneath
+  them — but a gate that depends on a page nobody promised will keep
+  working is a standing liability, not a solved problem. Whether that
+  access is appropriate is the operator's judgement, not something this
+  repo settles.
+- **Three gated fundamental fields have no provider.** `debt_equity`,
+  `promoter_holding` and `promoter_pledge` are declared and are gated
+  the moment a source supplies them, but nothing here parses a
+  shareholding filing and screener.in publishes no leverage figure. The
+  leverage and pledge filters are written and not yet biting.
 - **Screening covers Indian equities only.** NSE and BSE, via public
   exchange bhavcopy files. The series codes, circuit rules and delivery
   data it relies on do not generalise to other markets.
@@ -385,4 +403,5 @@ What works: the catalog, tier resolution, `install` / `list` / `init`,
 the lifecycle operations (`diff` / `update` / `remove`), `doctor`,
 external plugin install/remove (`plugin install` / `list` / `remove`),
 harness adapter generation for all four harnesses, the LifeOS and Forge
-agent ports, and both stock screens.
+agent ports, all three stock screens, and the `morning-shortlist`
+Workflow that composes two of them.

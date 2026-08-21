@@ -219,7 +219,12 @@ Known limits:
 
 - `stock-screening` covers **Indian equities only** (NSE and BSE) and is
   **end-of-day only** — there is no live or intraday path, so the
-  day-trading screen reviews a completed session for a named date.
+  day-trading screen reviews a completed session for a named date and
+  the morning shortlist screens the previous session's close.
+- The fundamental gate reads three **commercial sites** alongside the
+  exchange's own filings. Their pages are unversioned and will break
+  without notice; the run says which providers failed rather than
+  quietly dropping the fields they would have supplied.
 - Not published to a package index yet, so the `pipx install ai-agents`
   above does not resolve until the first release (#44). Installing from
   the repo URL works today and takes the same bundled catalog.
