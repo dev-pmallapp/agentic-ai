@@ -224,3 +224,24 @@ between states.
 - **`gh` unavailable or unauthenticated:** stop. See
   `## Preconditions`.
 - **Standard `gh` failures:** `References/gh-error-handling.md`.
+
+## Templates
+
+Two templates back this Skill's outputs:
+
+- `Templates/test-plan.md` — the plan document. Its `### <Category>`
+  headings and the `#` / `Test Case` / `Description` / `Priority`
+  columns are fixed: `story-test` matches its results rows back to
+  these case numbers.
+- `Templates/test-case.md` — one per case, for the instruction files
+  under `docs/test-plans/test-cases/{issue}/`. Its frontmatter is read
+  mechanically, `pass_criteria` above all.
+
+The templates hold the *shape*. What each category means, the three
+distinctions that are routinely collapsed, and the global-numbering
+and priority rules are step 5 above, and are deliberately not repeated
+in the templates — one place to edit when they change.
+
+Leave the plan's `## Results` table empty. `story-test` writes results
+to a separate file; a plan carrying its own results cannot be re-run
+without editing it.

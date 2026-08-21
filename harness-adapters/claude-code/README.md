@@ -90,13 +90,18 @@ six events, in a working plugin. It is the one part of any adapter in
 this repo backed by a real artifact rather than by reading docs.
 
 **Not generated.** `install.generate_harness_adapters` writes agent
-pointers and nothing else — no `hooks.json`, no scripts, on this
-harness or any other. The contract is a specification; a project that
-wants these behaviors registers them itself, and the table above is
-what to register them against. The two git-hook-deliverable hooks
-(`check-commit-prefix` as `commit-msg`, `issue-link-commit` as
-`post-commit`) are worth preferring even here, since they also cover
-commits made outside Claude Code.
+pointers and nothing else — no `hooks.json` and no hook scripts, on
+this harness or any other. The contract is a specification; a project
+that wants these behaviors registers them itself, and the table above
+is what to register them against.
+
+The one exception is a template rather than a registration:
+`agents/dev-lifecycle/Templates/git-commit-msg-hook.sh` ships the git
+`commit-msg` expression of `check-commit-prefix`, for a user to
+install into their own clone. Prefer it even here, since it also
+covers commits made outside Claude Code — and note it *rejects* where
+the `PreToolUse` expression only advises. `issue-link-commit`'s
+`post-commit` counterpart is specified but not shipped.
 
 Note the invariant the contract states for `check-commit-prefix`: a
 `PreToolUse` hook here can block a tool call, and must not. Advisory

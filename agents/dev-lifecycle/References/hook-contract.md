@@ -66,15 +66,18 @@ lifecycle rests on is silently missing for that commit. Detection
 moves to review time, where `task-test` and `story-test` read the
 commit log against the issue.
 
-**Delivery.** Prefer the git `commit-msg` hook. This is the one place
-the contract's advisory invariant is deliberately relaxed: a
-`commit-msg` hook can exit non-zero and *reject* the commit, which is
-strictly better than printing advice after the fact, and it works on
-every harness and on plain command-line git alike. Where a harness
-expresses this as its own pre-commit hook instead, it stays advisory —
-a harness hook that blocks a tool call is a worse failure mode than an
-unprefixed commit. State which of the two a given harness is doing;
-they are not interchangeable.
+**Delivery.** Prefer the git `commit-msg` hook, which is **shipped**:
+`Templates/git-commit-msg-hook.sh`, with install instructions in
+`Templates/CONTRIBUTING.md` § Commits. This is the one place the
+contract's advisory invariant is deliberately relaxed: a `commit-msg`
+hook can exit non-zero and *reject* the commit, which is strictly
+better than printing advice after the fact, and it works on every
+harness and on plain command-line git alike. Merge, `fixup!`/`squash!`,
+and `Revert` commits are exempt. Where a harness expresses this as its
+own pre-commit hook instead, it stays advisory — a harness hook that
+blocks a tool call is a worse failure mode than an unprefixed commit.
+State which of the two a given harness is doing; they are not
+interchangeable.
 
 ### issue-link-commit
 
@@ -94,7 +97,10 @@ is written, the other catches what actually got written.
 
 **Delivery.** Deliverable as a git `post-commit` hook, which reads the
 commit that just landed rather than a tool call's transcript, and so
-is both simpler and more accurate than the harness expression.
+is both simpler and more accurate than the harness expression. **No
+script is shipped for this one** — unlike `check-commit-prefix`, it
+has no counterpart in `Templates/`. It is a specification here and
+nothing more, which is the honest reading of "deliverable as".
 
 ### session-start
 
@@ -195,17 +201,31 @@ features or they are nothing, and where a harness lacks them the
 fallbacks named above — `status`, `checkpoint`, `AGENT.md` § Routing,
 and progress-file resumability — are the whole of the recovery.
 
-Git hooks are **not installed by this catalog**. `.git/hooks/` is
-local, untracked, and per-clone; writing into it is a mutation of a
-user's repository outside anything this agent was asked to do. Where a
-project wants them, its own setup installs them — a `core.hooksPath`
-directory checked into the repo is the usual way — and this contract
-is the specification to write them against.
+Of the two, only `check-commit-prefix` has a script in this catalog:
+`Templates/git-commit-msg-hook.sh`. `issue-link-commit` is specified
+here and not implemented anywhere.
+
+Git hooks are **not installed by this catalog**, shipped script
+included. `.git/hooks/` is local, untracked, and per-clone; writing
+into it is a mutation of a user's repository outside anything this
+agent was asked to do. The user installs it — either by copying into
+`.git/hooks/commit-msg`, or by committing it to a tracked directory
+and pointing `core.hooksPath` at that directory, which is how a
+project makes it reviewable and gets it to every contributor. Both
+forms are written out in `Templates/CONTRIBUTING.md` § Commits.
 
 ## Delivery Status
 
-This document is the contract. No hook is shipped as an executable
-script anywhere in this catalog, on any harness, as of task #30 — the
-port is a specification, and each harness adapter states what it can
-honor and what it cannot. Do not read a guarantee here as something
+This document is the contract, and it is mostly still only that.
+
+**One executable exists**: `Templates/git-commit-msg-hook.sh`, the git
+expression of `check-commit-prefix`, added by task #32. It ships as a
+template for a user to install, not as something this catalog turns
+on.
+
+Everything else here is a specification. The other five hooks have no
+script in this catalog, on any harness; the harness expressions are
+described in `harness-adapters/*/README.md` § Hooks but are not
+generated, and `install.generate_harness_adapters` writes agent
+pointers only. Do not read a guarantee in this document as something
 currently firing.

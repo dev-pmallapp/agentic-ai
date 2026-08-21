@@ -255,12 +255,24 @@ None. This Skill runs before any issue exists.
 ## Templates
 
 `Templates/ARCHITECTURE.md` and `Templates/CONTRIBUTING.md` are cited
-above by path but are **not yet ported** — they land with the rest of
-the scaffolding templates (milestone-3 task **#32**). Until then this
-Skill still runs: it creates the label set, discovers and confirms the
-build targets and commands, and appends those sections to existing
-documents. What it cannot yet do is write a *missing* ARCHITECTURE.md
-or CONTRIBUTING.md from scratch. Say so rather than improvising a
-document shape — the fixed table shapes are the contract those
-templates carry, and inventing one here would be the duplication this
-catalog's `References/` and `Templates/` split exists to prevent.
+above by path and are **present**. Write a missing document from its
+template rather than improvising a shape.
+
+Both carry a fixed-shape section — `## Build Targets` and
+`## Commands` respectively — found by exact heading text and read by
+column name. **Keep the heading and the columns verbatim.** Everything
+around them is the user's to rewrite freely; those two sections are
+not. A renamed heading or a table turned into prose does not error, it
+degrades silently: `context-discovery` falls back to guessing from the
+filesystem, and nothing announces that it did.
+
+Both templates state that contract inline, so a user editing the
+document later sees it without reading this Skill. Preserve those HTML
+comments when writing the file — they are the warning, not decoration.
+
+`Templates/CONTRIBUTING.md` also carries the install instructions for
+`Templates/git-commit-msg-hook.sh`, which enforces the commit prefix
+this lifecycle depends on. Installing it is the user's action, never
+this Skill's: `.git/hooks/` is per-clone and untracked, and writing
+there would be a change to their repository that nobody asked for.
+Point at the instructions; do not run them.
