@@ -1,9 +1,12 @@
 ---
 name: stock-screening
-description: Screen Indian equities (NSE and BSE) down to a ranked, reproducible shortlist against explicit criteria. USE WHEN screening Indian stocks, building a watchlist, or shortlisting trade candidates for a horizon. NOT FOR order execution, position sizing, portfolio accounting, or investment advice.
+description: Screen Indian equities (NSE and BSE) down to a ranked, reproducible shortlist against explicit technical and fundamental criteria. USE WHEN screening Indian stocks, building a watchlist, running a daily pre-open shortlist, or checking named stocks on valuation, growth and margins. NOT FOR order execution, position sizing, portfolio accounting, or investment advice.
 skills:
   - swing-trading
   - day-trading-shortlist
+  - fundamental-gate
+workflows:
+  - morning-shortlist
 ---
 
 # stock-screening
@@ -31,19 +34,23 @@ no credential exists. The full contract is in `References/market-data.md`.
 
 ## Routing
 
-Both screens are **Skills**: each runs end to end on its own and
-produces a shortlist without anything else having run first. Neither
-sequences the other, so neither is a Workflow.
+Each Skill runs end to end on its own and produces its result without
+anything else having run first. The Workflow is cumulative: it sequences
+two of them and owns the ordering between them.
 
 | Kind | Name | Trigger | File |
 |---|---|---|---|
 | Skill | **swing-trading** | Multi-day to multi-week holding horizon; trend, volume, volatility and delivery criteria | `Skills/swing-trading.md` |
 | Skill | **day-trading-shortlist** | A single named trading session; gap, relative-volume and catalyst criteria | `Skills/day-trading-shortlist.md` |
+| Skill | **fundamental-gate** | A set of named stocks to test on business quality — valuation, growth, margins, returns | `Skills/fundamental-gate.md` |
+| Workflow | **morning-shortlist** | The daily pre-open run: screen, gate the survivors, return ten | `Workflows/morning-shortlist.md` |
 
-`Workflows/` is empty by design. A cumulative run — screening both
-horizons and reconciling the two shortlists, say — would belong there
-and would compose these Skills rather than reimplement them. None
-exists yet, so none is claimed.
+`morning-shortlist` composes `swing-trading` and `fundamental-gate`
+rather than reimplementing either, and the order is the point:
+fundamentals are fetched only for names the technical screen already
+passed, which is what keeps a per-company data source affordable.
+Neither Skill depends on the Workflow, so a stalled run can be resumed
+a step at a time.
 
 ## References
 
@@ -57,6 +64,8 @@ rather than documentation of it.
 | `References/universe-and-exclusions.md` | Which securities are eligible at all: series and group keep-lists, price and liquidity floors, circuit-locked detection |
 | `References/swing-criteria.md` | Trend, volume, volatility and delivery thresholds, and the composite ranking |
 | `References/day-criteria.md` | Gap, relative-volume and range thresholds, the material-catalyst category list, and the composite ranking |
+| `References/fundamental-criteria.md` | The quality gate — provider precedence, valuation, growth, margin and return thresholds, and the missing-data rule |
+| `References/moneycontrol-sc-ids.json` | Ticker to moneycontrol id, maintained by hand because no public endpoint derives one |
 
 Change a threshold by editing the parameter table in the relevant
 Reference. The next run uses it. There is no separate config file, and
@@ -79,14 +88,29 @@ cannot, and a wrapper around `gh` did not clear it. This does:
 
 The alternative was asking a model to do the arithmetic over half a
 million rows in context, which would be slower, unreproducible, and
-wrong in ways nobody could audit. Two scripts, standard library only:
+wrong in ways nobody could audit. Three scripts, standard library only:
 `Tools/bhavcopy.py` fetches, caches and normalises; `Tools/screen.py`
-applies the criteria and ranks.
+applies the criteria and ranks; `Tools/fundamentals.py` merges company
+fundamentals across four providers and applies the quality gate.
+
+`fundamentals.py` clears the same bar for its own reasons: four sources
+disagree about which fields they publish, so merging them is a
+first-hit-wins resolution per field with provenance attached, and the
+trailing-twelve arithmetic behind a P/E spans four quarterly filings.
 
 ## Boundaries
 
 - Output is a candidate list with stated criteria, never a
   recommendation to buy or sell.
+- Fundamentals gate, they never rank. Membership of a shortlist is
+  decided by the quality gate; the order is the technical composite's.
+  Blending the two would let a cheap multiple compensate for a broken
+  setup.
+- Fundamental sources are **weaker than the price feed** and are treated
+  as such. Three of the four are commercial sites whose unversioned
+  pages can change without notice; the exchange's own filings are kept
+  as the credential-free floor beneath them. A missing fundamental is
+  unknown — never zero, and never a pass.
 - Data freshness is reported, never assumed. A screen run against
   stale data is labeled as such rather than presented as current.
 - Criteria are stated explicitly in the output. A shortlist whose
