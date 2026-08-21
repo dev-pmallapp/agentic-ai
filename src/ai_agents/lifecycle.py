@@ -27,7 +27,7 @@ from pathlib import Path
 
 from . import install
 
-__all__ = ["diff_agent", "update_agent", "remove_agent", "LocalDivergenceError"]
+__all__ = ["diff_agent", "update_agent", "remove_agent", "local_evidence", "LocalDivergenceError"]
 
 
 class LocalDivergenceError(RuntimeError):
@@ -43,11 +43,39 @@ class LocalDivergenceError(RuntimeError):
     def __init__(self, name: str, diff: dict):
         self.name = name
         self.diff = diff
-        total = len(diff["changed"]) + len(diff["local_only"]) + len(diff["master_only"])
+        total = len(local_evidence(diff))
         super().__init__(
-            f"{name!r} has diverged from its source ({total} file(s) differ); "
+            f"{name!r} has local edits ({total} file(s)); "
             "pass force=True (CLI: --force) to overwrite the local copy"
         )
+
+
+def local_evidence(diff: dict) -> list[str]:
+    """The files in a ``diff_agent`` result that are evidence of a local edit.
+
+    ``diff_agent`` reports drift symmetrically, which is right for a report:
+    someone running ``diff`` wants to see everything that differs, in either
+    direction. But ``update_agent`` is asking a narrower question — "would
+    refreshing this copy destroy work someone did here?" — and only two of
+    the three categories answer it.
+
+    ``changed`` counts: without a baseline recorded at install time there is
+    no way to tell a local edit from an upstream one, and guessing wrong in
+    the permissive direction silently destroys work. ``local_only`` counts:
+    a file that exists here and not upstream was almost certainly added
+    here. ``master_only`` does **not** count — a file the master has grown
+    since install is upstream moving forward, not this copy being edited,
+    and treating it as divergence would mean every routine "pick up the
+    latest" needed ``--force``. A flag that every ordinary update requires
+    is a flag nobody reads, which would leave the genuinely destructive case
+    unguarded — the opposite of what the never-overwrite default is for.
+
+    The accepted cost: a file deliberately deleted from the local copy looks
+    exactly like a file the master has since added, so an update restores
+    it. That resurrects something unwanted rather than destroying something
+    wanted, and ``diff`` still reports it under ``master_only`` beforehand.
+    """
+    return sorted(diff["changed"] + diff["local_only"])
 
 
 def _relative_files(root: Path) -> set[str]:
@@ -127,19 +155,25 @@ def update_agent(name: str, src_root: Path, dst_root: Path, *, force: bool = Fal
     reconciliation, mirroring ``install.copy_agent``'s own all-or-nothing
     shape. This is exactly the refresh path ``install.py``'s docstring
     already promises ("refreshing it means removing it first"), made
-    explicit and guarded: the deletion only runs after ``diff_agent``
+    explicit and guarded: the deletion only runs after ``local_evidence``
     confirms nothing would be silently lost, or after the caller has said
     ``force=True`` and accepted that it would be.
 
-    Returns the ``diff_agent`` result that was checked, whether or not
-    anything had actually diverged, so a caller always learns what changed
-    even on a clean update.
+    The guard is ``local_evidence(diff)``, not ``diff["diverged"]`` — an
+    upstream-only addition is the master moving forward, not this copy
+    being edited, so picking it up is the ordinary case and needs no flag.
+    See ``local_evidence`` for why that line is drawn there.
+
+    Returns the full ``diff_agent`` result that was checked, whether or not
+    anything had diverged, so a caller always learns what changed even on a
+    clean update — including the upstream-only additions that were pulled
+    in without ever tripping the guard.
 
     Raises ``FileNotFoundError`` if the agent is not already installed at
     ``dst_root`` (this is a refresh operation, not a first install — see
     ``install.copy_agent``) or if it is missing from ``src_root``. Raises
-    ``LocalDivergenceError`` if diverged and ``force`` is not set. Neither
-    error leaves any file touched — the divergence check runs entirely
+    ``LocalDivergenceError`` if there are local edits and ``force`` is not
+    set. Neither error leaves any file touched — the check runs entirely
     before the destination directory is removed.
     """
     dst = Path(dst_root) / "agents" / name
@@ -147,7 +181,7 @@ def update_agent(name: str, src_root: Path, dst_root: Path, *, force: bool = Fal
         raise FileNotFoundError(f"agent {name!r} is not installed at {dst_root}; use install first")
 
     diff = diff_agent(name, src_root, dst_root)
-    if diff["diverged"] and not force:
+    if local_evidence(diff) and not force:
         raise LocalDivergenceError(name, diff)
 
     shutil.rmtree(dst)

@@ -186,14 +186,16 @@ def install_cmd(name: str, tier: str) -> None:
     "--force",
     is_flag=True,
     default=False,
-    help="Overwrite the installed copy even if it has diverged from the user master.",
+    help="Overwrite the installed copy even if it holds local edits.",
 )
 def update_cmd(name: str, tier: str, force: bool) -> None:
     """Refresh agent NAME at a lower tier from the user master copy.
 
-    Refuses when the installed copy has diverged from the master — added,
-    removed, or changed any file — unless ``--force`` is given. Run
-    ``ai-agents diff`` first to see exactly what would be overwritten.
+    Picking up changes the master has made since install needs no flag —
+    that is the ordinary case. ``--force`` is only required when the
+    installed copy itself holds local edits (a changed or locally-added
+    file), because refreshing would destroy them. Run ``ai-agents diff``
+    first to see exactly what would be overwritten.
     """
     resolved = tiers.resolve(Path.cwd())
     dst_root = _resolve_dst(tier)
@@ -206,8 +208,11 @@ def update_cmd(name: str, tier: str, force: bool) -> None:
         raise click.ClickException(str(exc)) from exc
 
     click.echo(f"Updated {name} -> {dst_root / 'agents' / name}")
-    if diff["diverged"]:
-        click.echo("  local edits were overwritten (--force)")
+    overwritten = lifecycle.local_evidence(diff)
+    if overwritten:
+        click.echo(f"  {len(overwritten)} file(s) of local edits were overwritten (--force)")
+    if diff["master_only"]:
+        click.echo(f"  picked up {len(diff['master_only'])} new file(s) from the master")
 
     results = install.generate_harness_adapters(name, dst_root, tier=tier)
     _echo_pointer_results(results)

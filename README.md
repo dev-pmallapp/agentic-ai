@@ -55,17 +55,28 @@ from.
 | Command | Does | Mutates? |
 |---|---|---|
 | `ai-agents diff NAME [--project\|--workspace]` | Reports drift between the installed copy and the master: files changed, missing locally, or added locally. | Never. Read-only, always — safe to run before every `update`. |
-| `ai-agents update NAME [--project\|--workspace] [--force]` | Refreshes the installed copy from the master (delete, then recopy). | Refuses if the installed copy has diverged from the master, unless `--force` is given — a diverged copy may hold edits made on purpose. |
+| `ai-agents update NAME [--project\|--workspace] [--force]` | Refreshes the installed copy from the master (delete, then recopy). | Refuses if the installed copy holds local edits, unless `--force` is given — those edits may have been made on purpose. Picking up what the master has added since install needs no flag. |
 | `ai-agents remove NAME [--project\|--workspace]` | Deletes the agent directory from the tier, and the harness pointer files `install` generated for it. | Deletes. A pointer a person hand-authored (no `ai-agents`-generated marker in it) is left alone rather than deleted, even if it occupies the exact path a pointer would use. |
 
-**What counts as "diverged".** Every file under the installed agent
-directory and its master counterpart is compared byte-for-byte by its
-relative path — a file only one side has, or a file both sides have with
-different content, both count. mtimes and permissions are never
-consulted. This is a strict, symmetric definition on purpose: it is what
-lets `update` refuse to silently delete a locally-added file, or silently
-resurrect a locally-deleted one, not only to protect a file both sides
-already share.
+**What counts as drift, and what blocks an update.** Every file under the
+installed agent directory and its master counterpart is compared
+byte-for-byte by its relative path; mtimes and permissions are never
+consulted. `diff` reports all of it, in both directions — that is what a
+report is for. `update` asks a narrower question, and only two of the
+three kinds answer it:
+
+| Kind | `diff` shows it | Blocks `update`? |
+|---|---|---|
+| Changed on both sides | yes | **Yes.** Without a baseline recorded at install time there is no way to tell your edit from an upstream one, and guessing wrong destroys work. |
+| Local-only (here, not in the master) | yes | **Yes.** A file that exists only here was almost certainly added here. |
+| Master-only (in the master, not here) | yes | No. This is the master moving forward, not your copy being edited — picking it up is the ordinary case. |
+
+If master-only additions blocked an update, every routine "pick up the
+latest" would need `--force`, and a flag every ordinary command requires
+is a flag nobody reads — leaving the genuinely destructive case
+unguarded. The accepted cost: a file you deliberately deleted from your
+copy is indistinguishable from one the master has since added, so an
+update restores it. `diff` still lists it under master-only first.
 
 **What happens to a harness's shared context file on removal.** Claude
 Code and Cline get one pointer file per agent, so removing an agent just
