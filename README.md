@@ -35,6 +35,8 @@ ai-agents install stock-screening --project
 ai-agents diff stock-screening --project      # what would change on update?
 ai-agents update stock-screening --project    # refresh from the master copy
 ai-agents remove stock-screening --project    # drop it, and its pointers
+
+ai-agents doctor                              # harnesses, tiers, drift — all at once
 ```
 
 `init` and `install` never overwrite. An agent already present is left
@@ -89,6 +91,29 @@ empty "## AI Agents" heading with nothing under it), and if the file held
 nothing but that block, the file itself is deleted too — a tier with
 nothing installed looks the same whether or not it ever had anything
 installed. Hand-written text elsewhere in the file is always left alone.
+
+---
+
+## Checking the environment
+
+`ai-agents doctor` walks all three tiers at once — read-only, like `diff` —
+and reports:
+
+- which of the four harnesses are detected at each tier, naming the exact
+  path(s) probed to reach that answer;
+- each tier's root, whether it exists, and how many agents it holds;
+- any installed agent that has diverged from the user master copy (the
+  same comparison `diff` makes);
+- anything genuinely broken — an agent directory with no `AGENT.md`, or a
+  generated harness pointer whose agent directory is gone — each with a
+  concrete fix command.
+
+An absent harness, an empty tier, or a project/workspace tier that simply
+doesn't exist here are normal conditions, not defects — they're reported
+(`--`) but never counted as problems. A diverged copy is a warning
+(`warn`): `install.py`'s own rule is that a copy already installed may
+have been edited on purpose, so drift is not automatically wrong. The
+exit code is non-zero only when something is reported as broken (`FAIL`).
 
 ---
 
