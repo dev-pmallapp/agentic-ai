@@ -67,6 +67,13 @@ command lie.
   ``install._render_context_block``. Re-running any ``install``/``update``/
   ``remove`` at that tier already regenerates the block in full, which is
   the practical fix regardless.
+* An unreadable ``plugins.json``, or an external plugin recorded in it
+  that is not on disk. Unlike an agent, nothing here *loads* a plugin —
+  but the manifest is the only record of where one came from and what
+  could not bend, so a corrupt or lying record is a failure of the one
+  job this file has. See ``plugins.read_manifest`` for why malformed is
+  raised rather than degraded, which is the opposite of how ``catalog``
+  treats a broken ``AGENT.md``.
 
 **What counts as WARN, and why not ERROR.** Drift (``lifecycle.diff_agent``
 reports ``diverged``) is exactly the situation ``install.copy_agent``'s own
@@ -75,14 +82,17 @@ guarantee exists *because* a diverged copy can be intentional. Calling
 that broken would make ``doctor`` cry wolf on the tool's own normal
 operating mode. A dangling Skill reference (``catalog.find_dangling_skill_refs``)
 is a content-authoring mistake, not a failure of anything this tool
-manages — the agent still installs, copies, and points fine.
+manages — the agent still installs, copies, and points fine. An external
+plugin present on disk but absent from ``plugins.json`` is the same
+shape: it still works, since nothing here loads it, but its provenance is
+gone.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from . import catalog, install, lifecycle, tiers
+from . import catalog, install, lifecycle, plugins, tiers
 
 __all__ = ["run_checks", "OK", "INFO", "WARN", "ERROR"]
 
@@ -105,12 +115,13 @@ def run_checks(cwd: str | Path | None = None) -> dict:
     """Run every doctor check for ``cwd`` (default: the current directory).
 
     Returns ``{"tiers": [...], "harnesses": [...], "agents": [...],
-    "has_errors": bool}``. Each list holds one finding dict per check; see
-    ``_check_tier``, ``_check_harnesses``, and ``_check_agents`` for their
-    exact shapes. ``has_errors`` is ``True`` iff any finding anywhere in
-    the report carries ``status == ERROR`` — the only thing ``cli.doctor``
-    needs to decide its exit code, so it is precomputed here rather than
-    asking the caller to re-scan three lists.
+    "plugins": [...], "has_errors": bool}``. Each list holds one finding
+    dict per check; see ``_check_tier``, ``_check_harnesses``,
+    ``_check_agents``, and ``_check_plugins`` for their exact shapes.
+    ``has_errors`` is ``True`` iff any finding anywhere in the report
+    carries ``status == ERROR`` — the only thing ``cli.doctor`` needs to
+    decide its exit code, so it is precomputed here rather than asking
+    the caller to re-scan four lists.
 
     Purely reads: nothing on disk is created, written, or deleted, no
     matter what is found.
@@ -121,6 +132,7 @@ def run_checks(cwd: str | Path | None = None) -> dict:
     tier_findings = []
     harness_findings = []
     agent_findings = []
+    plugin_findings = []
 
     for tier_name in _TIER_NAMES:
         tier_root = resolved[tier_name]
@@ -135,18 +147,21 @@ def run_checks(cwd: str | Path | None = None) -> dict:
 
         if tier_root.is_dir():
             agent_findings.extend(_check_agents(tier_name, tier_root, user_root))
+            plugin_findings.extend(_check_plugins(tier_name, tier_root))
 
     # Every list, including harnesses — no harness check produces an ERROR
-    # today, but scanning only the two that currently can would quietly
+    # today, but scanning only the ones that currently can would quietly
     # break the promise above the moment one did.
     has_errors = any(
-        f["status"] == ERROR for f in (*tier_findings, *harness_findings, *agent_findings)
+        f["status"] == ERROR
+        for f in (*tier_findings, *harness_findings, *agent_findings, *plugin_findings)
     )
 
     return {
         "tiers": tier_findings,
         "harnesses": harness_findings,
         "agents": agent_findings,
+        "plugins": plugin_findings,
         "has_errors": has_errors,
     }
 
@@ -439,4 +454,106 @@ def _check_agents(tier_name: str, tier_root: Path, user_root: Path) -> list[dict
             findings.append(_drift_finding(tier_name, name, user_root, tier_root))
 
     findings.extend(_stale_pointer_findings(tier_name, tier_root, agent_names))
+    return findings
+
+
+# --------------------------------------------------------------------------
+# External plugins
+# --------------------------------------------------------------------------
+
+
+def _check_plugins(tier_name: str, tier_root: Path) -> list[dict]:
+    """Findings for the external plugins installed at this tier.
+
+    Returns a list of ``{"tier", "plugin", "source", "reason", "status",
+    "detail", "fix"}``. Empty when the tier has neither a manifest nor a
+    ``plugins/`` directory, which is the normal case — external plugins
+    are the exception, not the usual way to adopt something.
+
+    Three things can be wrong, and they are graded by what a reader can
+    still trust:
+
+    * **Manifest unreadable** -> ERROR, reported once for the tier with
+      ``plugin`` set to ``None``. Nothing else here can be believed if
+      the record is corrupt, so this short-circuits rather than guessing
+      from directory names.
+    * **Recorded but missing from disk** -> ERROR. The record claims
+      something is installed that is not there; anything relying on it is
+      broken now.
+    * **On disk but unrecorded** -> WARN, not ERROR. The plugin still
+      works — nothing here loads it — but its provenance is gone: no
+      source, and no statement of what could not bend. That is a
+      bookkeeping failure, and grading it as broken would be crying wolf
+      in exactly the way this module's docstring warns against.
+    """
+    try:
+        recorded = plugins.list_plugins(tier_root)
+    except plugins.PluginError as exc:
+        return [
+            {
+                "tier": tier_name,
+                "plugin": None,
+                "source": None,
+                "reason": None,
+                "status": ERROR,
+                "detail": str(exc),
+                "fix": (
+                    f"repair or delete {plugins.manifest_path(tier_root)} — "
+                    "it is machine-written JSON and nothing edits it by hand"
+                ),
+            }
+        ]
+
+    findings = []
+    for record in recorded:
+        if record["present"]:
+            findings.append(
+                {
+                    "tier": tier_name,
+                    "plugin": record["name"],
+                    "source": record.get("source"),
+                    "reason": record.get("reason"),
+                    "status": OK,
+                    "detail": f"installed from {record.get('source', 'an unrecorded source')}",
+                    "fix": "",
+                }
+            )
+        else:
+            findings.append(
+                {
+                    "tier": tier_name,
+                    "plugin": record["name"],
+                    "source": record.get("source"),
+                    "reason": record.get("reason"),
+                    "status": ERROR,
+                    "detail": f"recorded but missing from disk ({record['path']})",
+                    "fix": (
+                        f"ai-agents plugin remove {record['name']} --{tier_name} "
+                        "to drop the stale record, then reinstall if it is still wanted"
+                    ),
+                }
+            )
+
+    known = {r["name"] for r in recorded}
+    plugins_root = plugins.plugins_dir(tier_root)
+    if plugins_root.is_dir():
+        for path in sorted(p for p in plugins_root.iterdir() if p.is_dir()):
+            if path.name in known:
+                continue
+            findings.append(
+                {
+                    "tier": tier_name,
+                    "plugin": path.name,
+                    "source": None,
+                    "reason": None,
+                    "status": WARN,
+                    "detail": "present on disk but not recorded — provenance unknown",
+                    "fix": (
+                        f"reinstall it with ai-agents plugin install <source> "
+                        f"--name {path.name} --reason '<what could not bend>' --force, "
+                        "or delete it by hand"
+                    ),
+                }
+            )
+
     return findings
