@@ -24,7 +24,7 @@ from pathlib import Path
 
 import click
 
-from . import __version__, catalog, install, lifecycle, tiers
+from . import __version__, catalog, install, lifecycle, plugins, tiers
 # Names, not the module: the `doctor` command below shadows a module
 # import of the same name.
 from .doctor import ERROR, INFO, OK, WARN, run_checks
@@ -322,6 +322,100 @@ def remove_cmd(name: str, tier: str) -> None:
     _echo_pointer_results(result["pointers"], empty_note="no pointer files to clean up")
 
 
+@cli.group(name="plugin")
+def plugin_group() -> None:
+    """Manage external plugins installed alongside the catalog.
+
+    An external plugin is a directory this repo did not author and does
+    not interpret — it is copied in verbatim and left alone. This is the
+    **fallback**, not the normal way to adopt something: bend a plugin
+    into an agent's ``Skills/``, ``Workflows/``, and ``References/``
+    first, and reach for this only for the pieces that genuinely cannot
+    bend. See ``ARCHITECTURE.md`` § External Plugins.
+    """
+
+
+@plugin_group.command(name="install")
+@click.argument("source", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option(
+    "--reason",
+    required=True,
+    help="Which pieces could not bend into the catalog's anatomy, and why. Required.",
+)
+@click.option("--name", default=None, help="Install under this name (default: the source directory's name).")
+@click.option("--force", is_flag=True, help="Replace an existing plugin of the same name.")
+@_tier_options
+def plugin_install_cmd(source: Path, reason: str, name: str | None, force: bool, tier: str) -> None:
+    """Copy SOURCE into a tier's ``plugins/`` verbatim and record it.
+
+    ``--reason`` has no default on purpose. The fallback this implements
+    is only safe while it stays the exception, and the thing that keeps
+    it exceptional is having to write down what could not be ported.
+    """
+    dst_root = _resolve_dst(tier)
+
+    try:
+        record = plugins.install_plugin(
+            source, dst_root, reason=reason, name=name, force=force
+        )
+    except plugins.PluginError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(f"Installed external plugin {record['name']} at {record['path']}")
+    click.echo(f"  source: {record['source']}")
+    click.echo(f"  reason: {record['reason']}")
+    click.echo(f"  recorded in {plugins.manifest_path(dst_root)}")
+
+
+@plugin_group.command(name="remove")
+@click.argument("name")
+@_tier_options
+def plugin_remove_cmd(name: str, tier: str) -> None:
+    """Delete external plugin NAME from a tier.
+
+    Removes the plugin's own directory and its manifest entry, and
+    nothing else — no other plugin, and nothing under ``agents/``.
+    """
+    dst_root = _resolve_dst(tier)
+
+    try:
+        result = plugins.remove_plugin(name, dst_root)
+    except plugins.PluginError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if result["removed_dir"]:
+        click.echo(f"Removed {result['path']}")
+    else:
+        click.echo(f"No directory at {result['path']} — it was already gone")
+    if result["removed_record"]:
+        click.echo(f"Dropped its record from {plugins.manifest_path(dst_root)}")
+    else:
+        click.echo("It had no manifest record to drop")
+
+
+@plugin_group.command(name="list")
+@_tier_options
+def plugin_list_cmd(tier: str) -> None:
+    """List the external plugins recorded at a tier."""
+    dst_root = _resolve_dst(tier)
+
+    try:
+        recorded = plugins.list_plugins(dst_root)
+    except plugins.PluginError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if not recorded:
+        click.echo(f"No external plugins at the {tier} tier ({dst_root}).")
+        return
+
+    for record in recorded:
+        marker = "" if record["present"] else "  [MISSING FROM DISK]"
+        click.echo(f"{record['name']}{marker}")
+        click.echo(f"  source:    {record.get('source', '(unrecorded)')}")
+        click.echo(f"  reason:    {record.get('reason', '(unrecorded)')}")
+        click.echo(f"  installed: {record.get('installed', '(unrecorded)')}")
+
+
 #: Short tag printed ahead of every doctor finding. Kept to four characters
 #: so every line lines up regardless of status; ``info`` prints as ``--``
 #: rather than a word, since the whole point of that status is that it is
@@ -386,6 +480,26 @@ def _echo_doctor_agents(findings: list[dict]) -> None:
             click.echo(f"           fix: {f['fix']}")
 
 
+def _echo_doctor_plugins(findings: list[dict]) -> None:
+    """Render ``doctor.run_checks()["plugins"]``.
+
+    Silent when there are none — external plugins are the exception, and
+    a permanent "(none)" line would give them a standing presence in
+    every report that the architecture deliberately denies them.
+    """
+    if not findings:
+        return
+    click.echo("\nExternal plugins:")
+    for f in findings:
+        tag = _doctor_tag(f["status"])
+        label = f["plugin"] or "(manifest)"
+        click.echo(f"  [{tag}] [{f['tier']}] {label:<24} {f['detail']}")
+        if f["reason"]:
+            click.echo(f"           could not bend: {f['reason']}")
+        if f["fix"]:
+            click.echo(f"           fix: {f['fix']}")
+
+
 @cli.command()
 def doctor() -> None:
     """Report harness detection, tier contents, and drift.
@@ -401,10 +515,16 @@ def doctor() -> None:
     _echo_doctor_harnesses(report["harnesses"])
     _echo_doctor_tiers(report["tiers"])
     _echo_doctor_agents(report["agents"])
+    _echo_doctor_plugins(report["plugins"])
 
-    # All three lists, so the tally can never undercount against the exit
-    # code doctor.run_checks computed from the same three.
-    findings = (*report["tiers"], *report["harnesses"], *report["agents"])
+    # All four lists, so the tally can never undercount against the exit
+    # code doctor.run_checks computed from the same four.
+    findings = (
+        *report["tiers"],
+        *report["harnesses"],
+        *report["agents"],
+        *report["plugins"],
+    )
     problems = [f for f in findings if f["status"] in (WARN, ERROR)]
     if report["has_errors"]:
         errors = sum(1 for f in problems if f["status"] == ERROR)

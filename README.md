@@ -142,9 +142,12 @@ and reports:
 - each tier's root, whether it exists, and how many agents it holds;
 - any installed agent that has diverged from the user master copy (the
   same comparison `diff` makes);
-- anything genuinely broken — an agent directory with no `AGENT.md`, or a
-  generated harness pointer whose agent directory is gone — each with a
-  concrete fix command.
+- any external plugin installed at a tier, with the source it came from
+  and the reason it wasn't ported (omitted entirely when there are none);
+- anything genuinely broken — an agent directory with no `AGENT.md`, a
+  generated harness pointer whose agent directory is gone, or a plugin
+  record that no longer matches what's on disk — each with a concrete fix
+  command.
 
 An absent harness, an empty tier, or a project/workspace tier that simply
 doesn't exist here are normal conditions, not defects — they're reported
@@ -152,6 +155,37 @@ doesn't exist here are normal conditions, not defects — they're reported
 (`warn`): `install.py`'s own rule is that a copy already installed may
 have been edited on purpose, so drift is not automatically wrong. The
 exit code is non-zero only when something is reported as broken (`FAIL`).
+
+---
+
+## External plugins (the exception, not the path)
+
+Sometimes a plugin you want to adopt has a piece that won't fit — a
+harness-specific hook registration, a distribution manifest, something
+keyed to a primitive this catalog doesn't model.
+
+**The rule is one-way: bend the plugin into an agent, never the catalog
+into the plugin.** Port what you can into `Skills/`, `Workflows/`,
+`References/`, and `Templates/`; where there's no direct equivalent,
+express what the piece *guarantees* rather than copying its mechanism.
+Only when neither works does a piece get installed as-is:
+
+```bash
+ai-agents plugin install ./some-plugin \
+  --reason "hooks.json is a Claude-Code-only registration schema"
+ai-agents plugin list
+ai-agents plugin remove some-plugin
+```
+
+It lands at `<tier>/plugins/<name>/` — verbatim, beside `agents/`, never
+inside it. Nothing parses or loads it; `ai-agents list` can't see it.
+
+`--reason` is required and has no default, on purpose. An escape hatch
+with nothing to justify it becomes the easy way out, and the catalog ends
+up a thin wrapper around plugins nobody finished porting. `doctor` prints
+the reason back, so an unported piece stays visible instead of settling
+in quietly. Most agents need none of this — see `ARCHITECTURE.md`
+§ External Plugins for the full decision rule.
 
 ---
 
@@ -165,6 +199,7 @@ exit code is non-zero only when something is reported as broken (`FAIL`).
 | `agents/<Name>/References/` | Shared contracts the agent reads, cited by Skills and Workflows alike |
 | `agents/<Name>/Templates/` | Document shapes the agent writes into a user's project, and files the user installs |
 | `agents/<Name>/Tools/` | Scripts the agent shells out to |
+| `<tier>/plugins/<name>/` | An external plugin, installed verbatim beside the catalog — the fallback above, not part of any agent |
 | `harness-adapters/<harness>/` | How one harness discovers instructions, and what its pointer files will look like |
 | `src/ai_agents/` | The CLI — catalog, tier resolution, copying |
 | `docs/design/` | Numbered design notes, one per pass |
