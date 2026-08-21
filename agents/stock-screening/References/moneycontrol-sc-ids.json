@@ -1,0 +1,28 @@
+{
+  "_comment": [
+    "NSE symbol -> moneycontrol sc_id. See References/fundamental-criteria.md",
+    "§ Known Provider Limits: moneycontrol addresses companies by its own id",
+    "and publishes no working endpoint to derive one from a ticker, so this",
+    "mapping is maintained by hand and a symbol absent from it is reported as",
+    "unresolved rather than guessed at.",
+    "Every entry below was verified by fetching the pricefeed and checking the",
+    "NSEID it returned. Do that before adding one: sc_ids are not mnemonic and",
+    "the wrong guess resolves to a real but different company. 'HU' looks like",
+    "Hindustan Unilever and is Unimers India.",
+    "Tools/fundamentals.py re-checks NSEID on every fetch, so a bad entry here",
+    "fails loudly instead of contributing another company's ratios."
+  ],
+  "BAJAJ-AUTO": "BA06",
+  "BPCL": "BPC",
+  "HDFCBANK": "HDF01",
+  "ICICIBANK": "ICI02",
+  "INFY": "IT",
+  "ITC": "ITC",
+  "LT": "LT",
+  "M&M": "MM",
+  "RELIANCE": "RI",
+  "SBIN": "SBI",
+  "SUNPHARMA": "SPI",
+  "TATAMETALI": "TM",
+  "TCS": "TCS"
+}
