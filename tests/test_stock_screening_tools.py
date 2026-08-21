@@ -1048,3 +1048,34 @@ def test_signal_parameters_never_move_the_passing_set():
     assert [r["score"] for r in altered["candidates"]] == [
         r["score"] for r in baseline["candidates"]
     ]
+
+
+def test_top_overrides_the_shortlist_size():
+    # The swing screen truncates before returning, so a second stage that
+    # rejects most of its input needs a larger pool — otherwise a name
+    # ranked below the cut can never reach the final output, and nothing
+    # says it was dropped. See Workflows/morning-shortlist.md.
+    sessions = sessions_from({
+        f"n{i}": [bar(100.0 + j * 5, isin=f"INE000A010{i:02d}", symbol=f"CO{i}")
+                  for j in range(8)]
+        for i in range(4)
+    })
+    criteria = {**SWING_CRITERIA, "shortlist_size": 2}
+
+    small = screen.screen_swing(sessions, criteria, UNIVERSE_DEFAULTS)
+    large = screen.screen_swing(sessions, criteria, UNIVERSE_DEFAULTS, top=4)
+
+    assert len(small["candidates"]) == 2
+    assert len(large["candidates"]) == 4
+    # Same ranking, more of it — top must not reorder or rescore.
+    assert [r["symbol"] for r in large["candidates"][:2]] == [
+        r["symbol"] for r in small["candidates"]
+    ]
+    assert large["passing_total"] == small["passing_total"]
+
+
+def test_top_defaults_to_the_criteria_value():
+    sessions = sessions_from({"a": _uptrend()})
+    criteria = {**SWING_CRITERIA, "shortlist_size": 0}
+
+    assert screen.screen_swing(sessions, criteria, UNIVERSE_DEFAULTS)["candidates"] == []
