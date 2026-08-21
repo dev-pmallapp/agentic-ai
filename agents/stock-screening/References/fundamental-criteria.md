@@ -222,7 +222,18 @@ look identical to a company nobody publishes data for.
 | `max_result_age_quarters` | 2.0 | Quarters between the screened session and the latest published result |
 | `min_fields_known` | 3 | Gated fields that must be known for a name to be gateable at all |
 | `cache_max_age_days` | 7 | Refetch a provider's answer after this many days |
+| `gate_pool_size` | 60 | Technical candidates offered to the gate, before it rejects |
 | `final_shortlist_size` | 10 | Names the morning shortlist returns |
+
+`gate_pool_size` must be several times `final_shortlist_size`, and this
+is not a tuning preference. The gate is severe: on the measured
+2026-08-21 session it passed 9 of 25, rejected 11 and could not judge 5.
+A pool the size of the answer would return two or three names. Worse, it
+would do so *silently* — the truncation happens before the gate, so a
+name ranked 26th technically but excellent fundamentally can never
+appear, and nothing in the output would show that it was considered and
+cut. Set the pool to the technical screen's whole passing set unless
+there is a reason not to.
 
 `min_fields_known` must be at least 1 and no greater than the number of
 gated fields. Setting it to 0 would restore exactly the open door the

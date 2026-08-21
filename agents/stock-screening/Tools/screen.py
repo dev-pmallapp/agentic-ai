@@ -283,7 +283,12 @@ def eligible(entry: dict, universe: dict) -> tuple[bool, str]:
 # --------------------------------------------------------------------------
 
 
-def screen_swing(sessions: list[dict], criteria: dict, universe: dict) -> dict:
+def screen_swing(
+    sessions: list[dict],
+    criteria: dict,
+    universe: dict,
+    top: int | None = None,
+) -> dict:
     series = build_series(sessions, universe)
     rejected: dict[str, int] = {}
     passing = []
@@ -383,7 +388,12 @@ def screen_swing(sessions: list[dict], criteria: dict, universe: dict) -> dict:
         )
 
     _rank_swing(passing, criteria)
-    size = require(criteria, "shortlist_size")
+    # `top` exists for the case where this list feeds a second stage that
+    # rejects most of it. Truncating to shortlist_size first would mean a
+    # name ranked below the cut could never reach the final output no
+    # matter how well it scored downstream — see
+    # Workflows/morning-shortlist.md § Why The Pool Is Larger Than Ten.
+    size = top if top is not None else require(criteria, "shortlist_size")
     return {
         "candidates": passing[:size],
         "passing_total": len(passing),
@@ -848,6 +858,14 @@ def main(argv: list[str] | None = None) -> int:
 
     swing = sub.add_parser("swing", help="multi-day horizon")
     swing.add_argument("--as-of", required=True)
+    swing.add_argument(
+        "--top",
+        type=int,
+        help=(
+            "override shortlist_size. Needed when this list feeds a second "
+            "stage that rejects most of it — see Workflows/morning-shortlist.md"
+        ),
+    )
 
     day = sub.add_parser("day", help="one completed session")
     day.add_argument("--date", required=True)
@@ -875,7 +893,7 @@ def main(argv: list[str] | None = None) -> int:
             if not sessions:
                 print(f"no sessions found ending {end}", file=sys.stderr)
                 return 1
-            result = screen_swing(sessions, criteria, universe)
+            result = screen_swing(sessions, criteria, universe, top=args.top)
             env = bhavcopy.envelope(sessions[-1]["date"], len(sessions))
             payload = {"envelope": env, "criteria": criteria, **result}
             print(
