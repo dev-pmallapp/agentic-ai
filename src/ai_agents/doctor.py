@@ -136,7 +136,12 @@ def run_checks(cwd: str | Path | None = None) -> dict:
         if tier_root.is_dir():
             agent_findings.extend(_check_agents(tier_name, tier_root, user_root))
 
-    has_errors = any(f["status"] == ERROR for f in (*tier_findings, *agent_findings))
+    # Every list, including harnesses — no harness check produces an ERROR
+    # today, but scanning only the two that currently can would quietly
+    # break the promise above the moment one did.
+    has_errors = any(
+        f["status"] == ERROR for f in (*tier_findings, *harness_findings, *agent_findings)
+    )
 
     return {
         "tiers": tier_findings,

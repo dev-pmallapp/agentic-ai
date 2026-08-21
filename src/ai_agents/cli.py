@@ -25,7 +25,9 @@ from pathlib import Path
 import click
 
 from . import __version__, catalog, install, lifecycle, tiers
-from .doctor import run_checks
+# Names, not the module: the `doctor` command below shadows a module
+# import of the same name.
+from .doctor import ERROR, INFO, OK, WARN, run_checks
 
 
 def _tier_options(f):
@@ -282,7 +284,7 @@ def remove_cmd(name: str, tier: str) -> None:
 #: rather than a word, since the whole point of that status is that it is
 #: not something to alarm about — see ``doctor.py``'s module docstring for
 #: the vocabulary this maps.
-_DOCTOR_TAGS = {"ok": "ok  ", "info": "--  ", "warn": "warn", "error": "FAIL"}
+_DOCTOR_TAGS = {OK: "ok  ", INFO: "--  ", WARN: "warn", ERROR: "FAIL"}
 
 
 def _doctor_tag(status: str) -> str:
@@ -357,10 +359,13 @@ def doctor() -> None:
     _echo_doctor_tiers(report["tiers"])
     _echo_doctor_agents(report["agents"])
 
-    problems = [f for f in (*report["tiers"], *report["agents"]) if f["status"] in ("warn", "error")]
+    # All three lists, so the tally can never undercount against the exit
+    # code doctor.run_checks computed from the same three.
+    findings = (*report["tiers"], *report["harnesses"], *report["agents"])
+    problems = [f for f in findings if f["status"] in (WARN, ERROR)]
     if report["has_errors"]:
-        errors = sum(1 for f in problems if f["status"] == "error")
-        warnings = sum(1 for f in problems if f["status"] == "warn")
+        errors = sum(1 for f in problems if f["status"] == ERROR)
+        warnings = sum(1 for f in problems if f["status"] == WARN)
         click.echo(f"\n{errors} error(s), {warnings} warning(s) — see fix lines above.")
         raise SystemExit(1)
     elif problems:
