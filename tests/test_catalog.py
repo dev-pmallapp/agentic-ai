@@ -199,7 +199,17 @@ def test_list_agents_keeps_skills_and_workflows_independent_per_agent(tmp_path):
     assert agents["neither"]["workflows"] == []
 
 
-# --- Frontmatter/disk cross-check, mirrored for skills -----------------------
+# --- Frontmatter/disk cross-check, both kinds --------------------------------
+#
+# ``_merge_declared_and_disk`` is called once per kind, so its two
+# guarantees — declared-but-missing is KEPT as a drift signal,
+# on-disk-but-undeclared is APPENDED — have to hold for skills and
+# workflows alike. Both kinds are covered rather than skills alone: one
+# shared helper is exactly the shape that invites "one call site is
+# tested, so the behaviour is tested", and a kind-specific regression at
+# the other call site would slip straight through. The workflows pair
+# below is issue #49; nothing about the implementation changed with it,
+# which is the point.
 
 
 def test_declared_skill_missing_on_disk_is_kept_as_drift_signal(tmp_path):
@@ -221,6 +231,48 @@ def test_on_disk_skill_missing_from_frontmatter_is_appended(tmp_path):
     entry = catalog.read_agent(agent_dir)
 
     assert entry["skills"] == ["declared", "undeclared"]
+
+
+def test_declared_workflow_missing_on_disk_is_kept_as_drift_signal(tmp_path):
+    agent_dir = tmp_path / "agents" / "demo"
+    _write_agent_md(agent_dir, workflows=["ghost"])
+    (agent_dir / "Workflows").mkdir(parents=True)  # exists, but no ghost.md in it
+
+    entry = catalog.read_agent(agent_dir)
+
+    assert entry["workflows"] == ["ghost"]
+
+
+def test_on_disk_workflow_missing_from_frontmatter_is_appended(tmp_path):
+    agent_dir = tmp_path / "agents" / "demo"
+    _write_agent_md(agent_dir, workflows=["declared"])
+    _write_md(agent_dir / "Workflows", "declared")
+    _write_md(agent_dir / "Workflows", "undeclared")
+
+    entry = catalog.read_agent(agent_dir)
+
+    assert entry["workflows"] == ["declared", "undeclared"]
+
+
+def test_drift_in_one_kind_does_not_disturb_the_other(tmp_path):
+    """The two kinds are merged independently, and stay independent.
+
+    ``read_agent`` calls the same helper twice with different inputs. A
+    regression that crossed the wires — appending an on-disk workflow to
+    ``skills``, or letting one kind's declared list leak into the other —
+    would pass both single-kind tests above while corrupting any agent
+    that has both. `dev-lifecycle` has both.
+    """
+    agent_dir = tmp_path / "agents" / "demo"
+    _write_agent_md(agent_dir, skills=["ghost-skill"], workflows=["real-flow"])
+    _write_md(agent_dir / "Workflows", "real-flow")
+    _write_md(agent_dir / "Workflows", "extra-flow")
+    _write_md(agent_dir / "Skills", "extra-skill")
+
+    entry = catalog.read_agent(agent_dir)
+
+    assert entry["skills"] == ["ghost-skill", "extra-skill"]
+    assert entry["workflows"] == ["real-flow", "extra-flow"]
 
 
 # --- Lowercase-fallback (migration window) ------------------------------------
