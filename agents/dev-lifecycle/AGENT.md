@@ -118,9 +118,44 @@ Skills lives once in `References/` and is cited by path:
 |---|---|
 | `References/context-discovery.md` | Repo/build-target/command resolution — every Skill's step 1 |
 | `References/gh-operations.md` | Issue fetch, search, milestone, sub-issue, label, and PR primitives |
+| `References/gh-error-handling.md` | The twelve standard `gh` failure modes, and the verify-don't-assume rule for operations that exit 0 having done nothing |
 | `References/branch-and-pr-model.md` | Stacked-branch naming, creation, the task-issue closing-keyword gotcha, rebasing, dirty-state handling |
 | `References/workflow-states.md` | The `status:` label state machine and the resolved/closed roll-up checks |
-| `References/artifact-resolution.md` | The sentinel-comment-plus-committed-file pattern shared by design docs, test plans, and test results (consolidated from three near-duplicate files in the source material — see that file's opening note) |
+| `References/artifact-resolution.md` | The sentinel-comment-plus-committed-file pattern shared by every artifact kind, its per-target narrowing, and the sync-upward modes |
+| `References/build-systems.md` | Build-target detection per language, and why the declared table beats filesystem discovery |
+| `References/project-commands.md` | Where build/test/lint commands live, their placeholders, and their pass criteria |
+| `References/sizing-criteria.md` | T-shirt sizing at task, Story, and Epic level, and the data-limited estimate |
+
+### Source-to-reference mapping
+
+The source material carries **13** reference files; this port has
+**9**. Nothing is dropped — five of the source files describe one
+contract each and collapse into two. The mapping, so the correspondence
+is auditable rather than assumed:
+
+| Source reference | Ported to |
+|---|---|
+| `gh-operations` | `gh-operations.md` |
+| `gh-error-handling` | `gh-error-handling.md` |
+| `context-discovery` | `context-discovery.md` |
+| `workflow-states` | `workflow-states.md` |
+| `branch-and-pr-model` | `branch-and-pr-model.md` |
+| `build-systems` | `build-systems.md` |
+| `project-commands` | `project-commands.md` |
+| `sizing-criteria` | `sizing-criteria.md` |
+| `gh-api` (artifact storage) | `artifact-resolution.md` § Upload Procedure |
+| `artifact-gh-sync` | `artifact-resolution.md` § Syncing a Local Artifact Upward |
+| `design-doc-resolution` | `artifact-resolution.md` § Resolution Chain + § Narrowing to One Build Target |
+| `test-plan-resolution` | same, parameterized by sentinel and path |
+| `unit-test-resolution` | same, plus § Step 3b (committed test files) |
+
+The four artifact files are a 4-step resolution chain repeated with a
+different sentinel and path each time, and `gh-api` is the writer side
+of that same chain. Keeping them apart would mean four places to edit
+when the chain changes — which is precisely the drift `References/`
+exists to prevent. `unit-test-resolution`'s extra git-history step is
+genuinely unique and survives as its own step rather than being flattened
+away.
 
 This mirrors two things already decided elsewhere: the source
 material's own stated principle ("References hold the contracts,

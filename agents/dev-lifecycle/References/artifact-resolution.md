@@ -77,7 +77,39 @@ authenticates differently and fails confusingly on private repos.
 Search the artifact's directory (`docs/design/`, `docs/test-plans/`,
 `docs/test-results/`) for a file named or prefixed with `{issue}`. This
 catches the producer having written the file locally before an upload
-failure. If found, use it, then sync it upward (see below).
+failure. If found, use it, then sync it upward — see § Syncing a Local
+Artifact Upward.
+
+**Step 3b — Committed test files, unit test plans only:**
+
+The unit test chain has one source the others do not: the test code
+itself. When the plan is missing but the tests were written, the files
+are still the thing `task-test` has to run.
+
+```bash
+# Commits for this task
+git -C {repo_root} log --oneline --all --grep="^#{task}:"
+
+# Test files those commits touched
+git -C {repo_root} log --all --grep="^#{task}:" --name-only --format= \
+  | sort -u | grep -Ei '(^|/)(tests?|spec)/|_test\.|test_|\.test\.|_spec\.'
+```
+
+The task's PR is the more reliable view once one exists:
+
+```bash
+pr=$(gh pr list --repo {repo} --head "task/{task}-*" --state all \
+       --json number --jq '.[0].number')
+gh pr diff "$pr" --repo {repo} --name-only | grep -Ei '(^|/)(tests?|spec)/|_test\.|test_'
+```
+
+Record what is found as `{unit_test_files}`. A caller that wanted the
+*plan* and found only files must say so rather than reporting coverage
+it cannot vouch for:
+
+> "Found {n} committed test files for #{task} but no
+> `## dev-lifecycle-unit-tests` plan. Running the files directly;
+> coverage against the design doc is unverified."
 
 **Step 4 — Not found:**
 
@@ -144,6 +176,73 @@ gh issue view {issue} --repo {repo} --json comments \
 Zero after a reported success → retry once. Zero after the retry →
 warn and continue; do not block. This catches a run dying between
 "post reported success" and the comment actually persisting.
+
+## Narrowing to One Build Target
+
+A caller usually wants one build target's slice of an artifact, not the
+whole document. Given a task title of the form
+`Implement {name} for #{story}`:
+
+1. Extract `{name}`, stripping the wrapper. If the title does not match
+   the pattern, use the full title.
+2. Normalize: lowercase, spaces to hyphens, strip punctuation but
+   **preserve dots** — build target names contain them (`libhft.lib`).
+3. Find that target in the `## Build Targets` table.
+4. Aggregate every `### Code Path:` section whose `**Build target:**`
+   matches. One build target may have several code paths.
+5. If the document has no `## Build Targets` table, fall back to
+   matching a single `### Module:` or `### Code Path:` heading by the
+   normalized name.
+
+For a **test plan**, match test-case rows whose *Test Case* or
+*Description* column names the target, or whose case file lists it
+under `## Prerequisites`. If nothing matches, **use the whole plan**
+rather than reporting no coverage — a plan written before task
+decomposition often does not name targets at all, and reporting zero
+cases would read as "untested" when it means "not yet sliced".
+
+## Syncing a Local Artifact Upward
+
+When Step 3 finds a local artifact that never reached the issue,
+whether to upload it depends on who is asking.
+
+| Context | Mode |
+|---|---|
+| A Workflow driving a worker role | **Auto-upload** |
+| An interactively invoked Skill | **Warn and nudge** |
+
+**Auto-upload.** Commit if needed, push, then post the sentinel comment
+and verify it — the full writer-side procedure below.
+
+```bash
+cd "{repo_root}"
+if ! git diff --quiet -- "{artifact_path}" || \
+   ! git ls-files --error-unmatch "{artifact_path}" >/dev/null 2>&1; then
+  git add "{artifact_path}"
+  git commit -m "#{issue}: Add {artifact_label}"
+fi
+sha=$(git rev-parse HEAD)
+git push 2>/dev/null || true
+```
+
+Record `committed = true` and the permalink **only if the push
+succeeded**. If it failed — no upstream, no write access, offline —
+set `committed = false` with the reason and inline the content instead.
+
+On failure of both the commit and the comment, warn but never block:
+> "Could not sync {artifact_label} to #{issue} (commit {reason},
+> comment also failed). Using local content. Please upload manually."
+
+**Warn and nudge.** Do not upload. Print the artifact's location, say
+plainly that nothing downstream will find it, and give the commands:
+
+> "Found {artifact_label} locally at `{artifact_path}` but it is NOT on
+> issue #{issue}. Downstream Skills and other engineers will not find
+> it until it is uploaded. Re-run the producing Skill, or upload by
+> hand — prepend `{sentinel}` as the comment's first line."
+
+Do not block on the answer. The Skill proceeds with the local content
+either way.
 
 ## Error Handling
 
