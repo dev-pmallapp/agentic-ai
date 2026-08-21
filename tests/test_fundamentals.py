@@ -62,6 +62,19 @@ def criteria():
     return screen.load_criteria("fundamental-criteria.md", REFERENCES)
 
 
+@pytest.fixture
+def permissive(criteria):
+    """The real criteria, loosened so the fixture company passes.
+
+    RELIANCE's actual Jun 2026 figures fail two live thresholds — PAT
+    growth of -24.65% and ROE of 8.91%. That is the correct verdict, so
+    tests about *composition* (ordering, sizing, sector spread) loosen
+    the gate rather than inventing a company that passes it. The gate's
+    own behaviour is tested against the real thresholds elsewhere.
+    """
+    return {**criteria, "min_pat_growth_yoy": -100.0, "min_roe": 0.0}
+
+
 # Reliance's real quarterly numbers, trimmed to the five quarters the
 # derivation needs. Checked by hand against the rendered page: EPS over
 # the last four sums to 55.22, and Jun 2026 revenue is 27.02% above Jun
@@ -505,3 +518,94 @@ def test_min_fields_known_stays_within_the_gated_set(criteria):
     """Setting it to 0 would restore the absence-passes-everything door."""
     floor = screen.require(criteria, "min_fields_known")
     assert 1 <= floor <= len(fundamentals.GATED_FIELDS)
+
+
+# --------------------------------------------------------------------------
+# the morning-shortlist composition
+# --------------------------------------------------------------------------
+
+
+def test_gate_falls_back_to_the_exchange_floor_alone(cache, criteria):
+    """Every commercial provider down still produces a gated list.
+
+    This is the whole reason the exchange feed is kept as the floor
+    despite being the stalest source: when three unversioned commercial
+    pages change shape on the same day, the run degrades rather than
+    stopping.
+    """
+    record = fundamentals.fetch_fundamentals(
+        cache, "RELIANCE", ["screener", "tickertape", "exchange"], 86400.0
+    )
+    assert record["values"]["latest_quarter"] == "Jun 2026"
+
+    only_floor = fundamentals.fetch_fundamentals(
+        cache, "RELIANCE", ["nosuch", "alsonosuch", "exchange"], 86400.0
+    )
+    assert only_floor["provenance"]["latest_quarter"] == "exchange"
+    assert only_floor["values"]["latest_quarter"] == "Dec 2024"
+    assert len(only_floor["failures"]) == 2
+
+
+def test_the_floors_own_data_is_marked_stale_not_passed(cache, criteria):
+    """Degrading to the floor must not quietly gate on old results."""
+    record = fundamentals.fetch_fundamentals(
+        cache, "RELIANCE", ["exchange"], 86400.0, close=1313.20
+    )
+    verdict = fundamentals.evaluate(record, criteria, date(2026, 8, 21))
+
+    assert "results are stale" in verdict["reasons"]
+    assert verdict["passed"] is False
+
+
+def test_gate_preserves_the_technical_ordering(cache, permissive):
+    """The gate decides membership; the composite decides order."""
+    swing = _swing("RELIANCE", "RELIANCE", "RELIANCE")
+    for index, candidate in enumerate(swing["candidates"]):
+        candidate["score"] = 0.1 * index
+
+    result = fundamentals.run_gate(cache, swing, permissive, top=3)
+
+    assert [row["score"] for row in result["candidates"]] == [0.0, 0.1, 0.2]
+
+
+def test_gate_carries_signals_through_to_the_final_list(cache, permissive):
+    result = fundamentals.run_gate(cache, _swing("RELIANCE"), permissive)
+
+    assert result["candidates"][0]["signals"] == ["breakout"]
+
+
+def test_final_shortlist_size_is_read_not_hardcoded(cache, permissive):
+    swing = _swing(*["RELIANCE"] * 12)
+
+    ten = fundamentals.run_gate(cache, swing, permissive)
+    three = fundamentals.run_gate(cache, swing, {**permissive, "final_shortlist_size": 3})
+
+    assert len(ten["candidates"]) == screen.require(permissive, "final_shortlist_size")
+    assert len(three["candidates"]) == 3
+
+
+def test_gate_pool_must_exceed_the_final_size(criteria):
+    """A pool the size of the answer would silently starve the shortlist.
+
+    The gate rejects a majority — 21 of 55 passed on the measured
+    2026-08-21 session — so a pool of ten returns three or four names,
+    and the ones cut before the gate leave no trace in the output.
+    """
+    pool = screen.require(criteria, "gate_pool_size")
+    final = screen.require(criteria, "final_shortlist_size")
+
+    assert pool >= final * 3
+
+
+def test_sector_spread_counts_the_final_list_only(cache, permissive):
+    result = fundamentals.run_gate(cache, _swing("RELIANCE", "RELIANCE"), permissive)
+
+    assert result["sectors"] == [("Oil & Gas - Refining & Marketing", 2)]
+
+
+def test_unknown_sector_is_labelled_not_dropped(cache, permissive):
+    result = fundamentals.run_gate(cache, _swing("RELIANCE"), {
+        **permissive, "provider_precedence": ["screener"],
+    })
+
+    assert result["sectors"] == [("unknown", 1)]

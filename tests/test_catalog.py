@@ -15,15 +15,21 @@ def test_lists_the_scaffolded_agents():
     assert "dev-lifecycle" in names
 
 
-def test_stock_screening_has_both_skills_and_no_workflows():
-    # Post-migration shape: swing-trading and day-trading-shortlist live
-    # under Skills/ (each is atomic and individually invocable), and
-    # Workflows/ is empty by design — see agents/stock-screening/AGENT.md.
+def test_stock_screening_has_three_skills_and_the_morning_workflow():
+    # Each Skill is atomic and individually invocable. morning-shortlist
+    # is the agent's first Workflow: it sequences swing-trading and
+    # fundamental-gate and owns the ordering between them — fundamentals
+    # are fetched only for names the technical screen already passed.
+    # Workflows/ was empty by design until there was an ordering to own.
     agents = {a["name"]: a for a in catalog.list_agents(REPO_ROOT)}
     screening = agents["stock-screening"]
 
-    assert set(screening["skills"]) == {"swing-trading", "day-trading-shortlist"}
-    assert screening["workflows"] == []
+    assert set(screening["skills"]) == {
+        "swing-trading",
+        "day-trading-shortlist",
+        "fundamental-gate",
+    }
+    assert screening["workflows"] == ["morning-shortlist"]
     assert screening["description"]
 
 
