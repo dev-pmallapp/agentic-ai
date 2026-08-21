@@ -93,6 +93,38 @@ Reporting a BSE-primary stock as "delivery 0%" would be a fabrication,
 and it would systematically exclude exactly the names the reconciliation
 rule assigned to BSE.
 
+## Signals
+
+The four filters above decide *who* qualifies. They do not say *what
+setup* a qualifying name is showing, and two stocks can clear identical
+thresholds while presenting completely different trades — one breaking
+out to a new high, the other stalled far above its moving average with
+nowhere obvious to place a stop.
+
+Signals name that difference. They are **classification, not a filter**:
+they are computed after a name has already passed, they never change who
+passes, and they carry no weight in the score. A name may show more than
+one, or none at all; none is a normal result for a stock quietly holding
+its trend, not an error.
+
+| Signal | Condition | Reading |
+|---|---|---|
+| `breakout` | Close is the highest close of the last `signal_breakout_window` sessions | Taking out prior supply |
+| `cross` | The moving-average stack completed within `signal_cross_lookback` sessions | A fresh trend rather than a mature one |
+| `pullback` | Close within `signal_pullback_pct` of the short average | Entry near support, tighter stop |
+| `extended` | Close more than `signal_extended_pct` above the short average | Chase risk — the stop is far away |
+
+`pullback` and `extended` are opposite ends of the same measurement and
+cannot both appear, provided `signal_pullback_pct` stays below
+`signal_extended_pct`.
+
+`extended` is deliberately a *label rather than an exclusion*. A stock
+far above its average is often the strongest name on the list, and
+whether that is an opportunity or a bad entry depends on the trade being
+placed — which is a decision for the human this shortlist is handed to,
+not for the screen. Turning it into a filter would make that decision
+silently, which is the thing this agent does not do.
+
 ## Ranking
 
 A composite score, not a lexicographic sort — a name that is excellent
@@ -143,6 +175,10 @@ thresholds.
 | `weight_volume` | 0.20 | Composite weight |
 | `weight_volatility` | 0.20 | Composite weight |
 | `weight_delivery` | 0.25 | Composite weight |
+| `signal_breakout_window` | 60 | Sessions the close must top to read as a breakout |
+| `signal_cross_lookback` | 10 | Sessions within which the average stack completed to read as a fresh cross |
+| `signal_pullback_pct` | 3.0 | Percent above the short average, at or below which the entry reads as a pullback |
+| `signal_extended_pct` | 12.0 | Percent above the short average, at or above which the entry reads as extended |
 | `shortlist_size` | 25 | Names returned |
 
 `lookback_sessions` must be at least `sma_long`, `high_window`,
@@ -153,8 +189,11 @@ the average needs.
 
 ## Known Limits
 
-- **No fundamentals.** Nothing here reads earnings, valuation, debt, or
-  ownership. This is a price-volume-delivery screen and nothing more.
+- **No fundamentals in these criteria.** Nothing in this file reads
+  earnings, valuation, debt, or ownership. It is a price-volume-delivery
+  screen and nothing more. The business behind a name is tested
+  separately, by `References/fundamental-criteria.md`, and only for
+  names that have already passed everything here.
 - **No corporate-action adjustment.** A split, bonus, or large dividend
   inside the lookback distorts every moving average and range that
   crosses it. The bhavcopy feed carries unadjusted prices, so an

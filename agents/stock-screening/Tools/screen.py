@@ -138,6 +138,49 @@ def atr_pct(bars: list[dict], window: int) -> float | None:
     return (sum(ranges) / len(ranges)) / close * 100.0
 
 
+def swing_signals(closes: list[float], short: float, criteria: dict) -> list[str]:
+    """Name the setup a already-passing stock is showing.
+
+    Classification, never a filter. This runs after every threshold has
+    already been cleared, it cannot change who passes, and it carries no
+    weight in the score — see References/swing-criteria.md § Signals.
+    An empty list is a normal result for a stock quietly holding its
+    trend, not a failure to classify.
+    """
+    found: list[str] = []
+    close = closes[-1]
+
+    window = require(criteria, "signal_breakout_window")
+    if len(closes) >= window and close >= max(closes[-window:]):
+        found.append("breakout")
+
+    # A cross is read from history, not from the current stack: every
+    # name here already has close > short > long, so the question is how
+    # recently that became true. Walking back until the stack is absent
+    # answers it without storing prior state.
+    lookback = require(criteria, "signal_cross_lookback")
+    sma_short = require(criteria, "sma_short")
+    sma_long = require(criteria, "sma_long")
+    for back in range(1, int(lookback) + 1):
+        earlier = closes[:-back]
+        was_short = sma(earlier, sma_short)
+        was_long = sma(earlier, sma_long)
+        if was_short is None or was_long is None:
+            break
+        if was_short <= was_long:
+            found.append("cross")
+            break
+
+    if short > 0:
+        distance = (close - short) / short * 100.0
+        if distance <= require(criteria, "signal_pullback_pct"):
+            found.append("pullback")
+        elif distance >= require(criteria, "signal_extended_pct"):
+            found.append("extended")
+
+    return found
+
+
 def median(values: list[float]) -> float | None:
     values = [v for v in values if v is not None]
     if not values:
@@ -335,6 +378,7 @@ def screen_swing(sessions: list[dict], criteria: dict, universe: dict) -> dict:
                 "atr_pct": round(atr, 2),
                 "delivery_pct": round(delivery, 2),
                 "delivery_partial": len(known) < len(recent_bars),
+                "signals": swing_signals(closes, short, criteria),
             }
         )
 
@@ -680,20 +724,26 @@ def render_swing(result: dict, env: dict, criteria: dict, universe: dict) -> str
             "min_atr_pct",
             "max_atr_pct",
             "min_delivery_pct",
+            "signal_breakout_window",
+            "signal_cross_lookback",
+            "signal_pullback_pct",
+            "signal_extended_pct",
         ],
     )
     out += ["", f"{'#':>3}  {'SYMBOL':<12} {'EX':<4} {'CLOSE':>9} "
             f"{'>SMA50':>7} {'<HIGH':>6} {'VOLx':>5} {'ATR%':>5} "
-            f"{'DELIV':>6} {'TURNOVER':>10}  SCORE"]
-    out.append("  " + "-" * 88)
+            f"{'DELIV':>6} {'TURNOVER':>10} {'SIGNALS':<22} SCORE"]
+    out.append("  " + "-" * 110)
     for index, row in enumerate(result["candidates"], 1):
         mark = "*" if row["delivery_partial"] else " "
+        signals = ",".join(row.get("signals") or []) or "-"
         out.append(
             f"{index:>3}  {row['symbol']:<12} {row['exchange']:<4} "
             f"{row['close']:>9,.2f} {row['pct_above_sma_long']:>6.1f}% "
             f"{row['pct_below_high']:>5.1f}% {row['volume_ratio']:>5.2f} "
             f"{row['atr_pct']:>5.2f} {row['delivery_pct']:>5.1f}{mark} "
-            f"{_rupees(row['median_turnover']):>10}  {row['score']:.3f}"
+            f"{_rupees(row['median_turnover']):>10} {signals:<22} "
+            f"{row['score']:.3f}"
         )
     if any(r["delivery_partial"] for r in result["candidates"]):
         out.append("")
