@@ -248,9 +248,10 @@ Stated plainly so the scope is not overread:
 - **No external plugin installation.** The bend-first rule means
   anything that cannot fit the agent anatomy installs project-locally
   instead; that path is not built.
-- **No packaging or CI.** The catalog is read off a tier root on disk,
-  not shipped as package data, so a non-editable install has no
-  `agents/` tree to read. Milestone 4 covers this.
+- **Not published to a package index.** The catalog now ships as package
+  data, so a wheel installs and seeds without a checkout — but no release
+  has been cut, so `pipx install ai-agents` does not resolve yet.
+  Installing from the repo URL does. Milestone 4 covers the rest.
 
 What works: the catalog, tier resolution, `install` / `list` / `init`,
 the lifecycle operations (`diff` / `update` / `remove`), `doctor`,

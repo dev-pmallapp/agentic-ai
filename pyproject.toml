@@ -21,5 +21,26 @@ dev = ["pytest>=8.0"]
 [tool.hatch.build.targets.wheel]
 packages = ["src/ai_agents"]
 
+# The agent catalog ships inside the wheel rather than being fetched at
+# `init` time. `agents/` sits outside the package directory, so it has to be
+# pulled in deliberately; it lands as `ai_agents/_catalog/`, which is what
+# `cli._catalog_source()` reads. Reasoning is recorded in
+# docs/design/2-catalog-distribution.md — briefly: `init` stays offline,
+# and the catalog is version-locked to the hand-rolled frontmatter parser
+# in `catalog.py` that has to read it.
+[tool.hatch.build.targets.wheel.force-include]
+"agents" = "ai_agents/_catalog"
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src",
+    "tests",
+    "agents",
+    "harness-adapters",
+    "docs",
+    "*.md",
+    "pyproject.toml",
+]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]

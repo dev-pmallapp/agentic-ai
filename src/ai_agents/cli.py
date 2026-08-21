@@ -61,19 +61,55 @@ def _resolve_dst(tier: str) -> Path:
     return dst_root
 
 
-def _repo_root() -> Path:
-    """Best-effort location of a checkout of this repo (for ``init``).
+#: The catalog as it lands inside an installed wheel. ``agents/`` is
+#: force-included at build time (see ``pyproject.toml``), so on any
+#: non-editable install this directory *is* the catalog — no checkout, no
+#: network, no ``--source``.
+_BUNDLED_CATALOG = Path(__file__).resolve().parent / "_catalog"
+
+
+def _checkout_catalog() -> Path | None:
+    """The ``agents/`` tree of a checkout of this repo, if we are in one.
 
     Walks up from this file looking for a directory holding both
-    ``agents/`` and ``pyproject.toml``. Works for an editable install of a
-    checkout, which is how ``init`` is expected to be run; a non-editable
-    install has no bundled ``agents/`` tree, so ``init`` there needs an
-    explicit ``--source``.
+    ``agents/`` and ``pyproject.toml``. This is the *developer* path: an
+    editable install points at ``src/`` in the working tree, where the
+    build-time force-include has not run and so no ``_catalog`` exists.
+    Returns ``None`` when no such ancestor is found.
     """
     for candidate in Path(__file__).resolve().parents:
         if (candidate / "agents").is_dir() and (candidate / "pyproject.toml").is_file():
-            return candidate
-    return Path.cwd()
+            return candidate / "agents"
+    return None
+
+
+def _catalog_source() -> Path:
+    """Where ``init`` seeds the user master from, absent ``--source``.
+
+    Two places, in order: the catalog bundled into the installed package,
+    then a checkout of this repo. The bundled copy wins so that a developer
+    who *also* has the package installed gets a predictable answer rather
+    than one that depends on where the interpreter resolved ``ai_agents``.
+
+    Deliberately raises instead of falling back to ``Path.cwd()``. The old
+    fallback meant ``init`` run from an arbitrary directory would either
+    seed from whatever ``agents/`` happened to be underfoot or fail with a
+    message pointing at a path the user never named — both worse than
+    saying plainly that there is no catalog to seed from.
+    """
+    if _BUNDLED_CATALOG.is_dir():
+        return _BUNDLED_CATALOG
+
+    checkout = _checkout_catalog()
+    if checkout is not None:
+        return checkout
+
+    raise click.ClickException(
+        "no agent catalog found: this install bundles none and no checkout of "
+        "the repo was found above "
+        f"{Path(__file__).resolve().parent}. Reinstall the package, or pass "
+        "`--source /path/to/checkout`."
+    )
 
 
 @click.group()
@@ -120,11 +156,18 @@ def list_cmd() -> None:
     "--source",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     default=None,
-    help="Repo checkout to seed from (default: auto-detected).",
+    help="Repo checkout to seed from (default: the catalog shipped with this install).",
 )
 def init(source: Path | None) -> None:
-    """Populate the user master tier (~/.ai-agents) from this repo."""
-    src = (source or _repo_root()) / "agents"
+    """Populate the user master tier (~/.ai-agents) with the agent catalog.
+
+    Needs no arguments: the catalog ships inside the package, so a plain
+    ``ai-agents init`` works on an ordinary ``pipx``/``uv`` install with no
+    checkout, no network, and no git. ``--source`` remains a developer
+    convenience for seeding from a specific checkout instead — it takes the
+    repo root, and the ``agents/`` directory beneath it is what gets copied.
+    """
+    src = (source / "agents") if source is not None else _catalog_source()
     dst = tiers.user_root() / "agents"
 
     if not src.is_dir():
