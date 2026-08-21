@@ -174,10 +174,10 @@ issue/PR-driven development lifecycle. For that, and only that, the
 Forge plugin at `/home/pmallapp/tmp/gh-workflow` is the reference —
 specifically its agent split (`forge-planner` / `forge-coder` /
 `forge-validator`) over a milestone → story → task → PR hierarchy.
-`agents/dev-lifecycle/` holds that port: sixteen Skills, one Workflow,
-and nine References covering project bootstrap through
-requirements, design, test plans, implementation, validation, and
-milestone close-out. Forge itself is untouched and stays an independent
+`agents/dev-lifecycle/` holds that port: seventeen Skills, six
+Workflows, and nine References covering project bootstrap,
+requirements, design, test plans, implementation, validation,
+milestone close-out, the bug track, and orchestration. Forge itself is untouched and stays an independent
 repo — content moves out of it in one direction only. What the port
 deliberately leaves out is recorded in
 `agents/dev-lifecycle/AGENT.md`.

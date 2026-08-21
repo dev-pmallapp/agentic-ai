@@ -55,10 +55,13 @@ def test_dev_lifecycle_has_the_ported_skills_and_workflow():
         "story-test-replan",
         "checkpoint",
         "resume",
+        # the bug track — story #24, task #29
+        "bug-analyze",
     }
     assert set(dev_lifecycle["workflows"]) == {
         "autodev",
         "autodev-mytasks",
+        "bug-fix",
         # the three worker roles autodev composes — story #24, task #29
         "planner",
         "coder",

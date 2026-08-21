@@ -6,8 +6,9 @@ then aggregated. **No time estimates**, deliberately: a size is a
 comparison between pieces of work, and attaching hours to it invites
 the number to be read as a commitment.
 
-Used by the `size` Skill (not yet ported — see `AGENT.md`), and
-documented here for team calibration regardless.
+Used by the `size` Skill, and by `planner`, which sizes each Story
+while its design is fresh. Documented here for team calibration
+regardless of whether either is run.
 
 ## Task-Level Sizing (per build target)
 

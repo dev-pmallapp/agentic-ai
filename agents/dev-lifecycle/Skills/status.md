@@ -181,6 +181,17 @@ None.
   explicitly.
 - **Standard `gh` failures:** `References/gh-error-handling.md`.
 
-The bug view — RCA state and fix-PR routing — is not part of this port;
-see `AGENT.md` § What's Ported and What Isn't. Bugs still appear in the
-dashboard's open-bugs count.
+## Bug View
+
+For a `type:bug` issue: whether an RCA exists
+(`## dev-lifecycle-rca`) and its stated confidence, the classification
+and scope it recorded, the `bug/{issue}-{slug}` branch and its PR, and
+the test results.
+
+Next action, first match wins: no RCA → `bug-analyze`; an RCA but no
+PR → `bug-fix`; a PR open → review it.
+
+Report the RCA's confidence rather than just its existence. An RCA
+marked `hypothesis` is triage output, not a diagnosis, and a dashboard
+that shows only "RCA: yes" hides exactly the distinction that decides
+whether a fix should be written yet.

@@ -242,7 +242,8 @@ gh pr list --repo {repo} --head "task/{task}-{slug}" \
 
 A Projects v2 board mirror, and rate-limit backoff, are both part of
 Forge's fuller `gh-operations.md` and are not carried into this port —
-neither is needed by the sixteen Skills and one Workflow authored here.
+neither is needed by the seventeen Skills and six Workflows authored
+here.
 Labels remain the sole source of truth. See `AGENT.md` for what is
 deferred and where.
 

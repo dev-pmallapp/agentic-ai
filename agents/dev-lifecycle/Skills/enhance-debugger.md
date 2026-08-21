@@ -209,9 +209,16 @@ see `AGENT.md` § Boundaries.
   and can be done by hand.
 - **Standard `gh` failures:** `References/gh-error-handling.md`.
 
-Root-cause documents from the bug track are a source this Skill would
-otherwise read; that track is not part of this port, so bug-derived
-learnings come from issue comments and commits like any other.
+**Root-cause documents are the highest-signal source available** —
+already-structured root causes, each with a classification, a trigger
+condition, and a stated confidence. Collect them for every bug in the
+milestone, via `## dev-lifecycle-rca` sentinels and
+`docs/design/*-rca.md`, and read them before the raw comment threads: a
+learning that an RCA already states precisely does not need
+re-deriving from the conversation that produced it.
+
+An RCA marked `confidence: hypothesis` maps to a **low-confidence**
+learning in step 5, not a high one, however well-written it reads.
 
 ## Templates
 
