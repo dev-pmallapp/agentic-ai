@@ -1,11 +1,19 @@
 """The ``ai-agents`` command line.
 
-Four commands: ``init`` populates the user master tier, ``list`` shows what
-is in it, ``install`` copies one agent down into a project or workspace
-tier, and ``doctor`` is reserved for environment checks.
+``init`` populates the user master tier, ``list`` shows what is in it,
+``install`` copies one agent down into a project or workspace tier,
+``update``/``diff``/``remove`` maintain an agent already installed there,
+and ``doctor`` is reserved for environment checks.
 
 The CLI's whole job is moving agent directories between tiers. It does not
 interpret an agent's content — that is the harness's job.
+
+``update``, ``diff``, and ``remove`` share ``install``'s ``--project`` /
+``--workspace`` destination flags and the same source: the user master
+tier. That mirrors ``install_cmd`` exactly, on purpose — an agent is always
+installed *from* the master, so refreshing or diffing it is a comparison
+against that same master, not against whichever tier happens to be above
+it in the resolution order.
 """
 
 from __future__ import annotations
@@ -15,7 +23,38 @@ from pathlib import Path
 
 import click
 
-from . import __version__, catalog, install, tiers
+from . import __version__, catalog, install, lifecycle, tiers
+
+
+def _tier_options(f):
+    """Shared ``--project``/``--workspace`` destination flags.
+
+    Factored out because ``install``, ``update``, ``diff``, and ``remove``
+    all resolve their destination tier identically — one is default, the
+    other opt-in, never both.
+    """
+    f = click.option(
+        "--workspace", "tier", flag_value="workspace", help="Use the workspace tier."
+    )(f)
+    f = click.option(
+        "--project", "tier", flag_value="project", default=True, help="Use the project tier (default)."
+    )(f)
+    return f
+
+
+def _resolve_dst(tier: str) -> Path:
+    """The destination tier root for ``update``/``diff``/``remove``/``install``.
+
+    Raises ``click.ClickException`` with a tier-specific hint when the
+    requested tier does not resolve here, matching ``install_cmd``'s
+    existing error message exactly.
+    """
+    resolved = tiers.resolve(Path.cwd())
+    dst_root = resolved[tier]
+    if dst_root is None:
+        hint = "not inside a git repo" if tier == "project" else "no ancestor declares a .ai-agents workspace"
+        raise click.ClickException(f"no {tier} tier here ({hint})")
+    return dst_root
 
 
 def _repo_root() -> Path:
@@ -96,18 +135,32 @@ def init(source: Path | None) -> None:
     click.echo(f"Initialized {dst} from {src}")
 
 
+def _echo_pointer_results(results: list[dict], *, empty_note: str = "no pointer files written") -> None:
+    """Print a ``{"harness", "path", "action", "reason"}`` list the same way
+    everywhere — ``install``, ``update``, and ``remove`` all end with one.
+
+    ``empty_note`` exists because "no harness detected" means something
+    different depending on the caller: nothing was written on install,
+    nothing was there to clean up on remove.
+    """
+    if not results:
+        click.echo(f"No supported harness detected here — {empty_note}.")
+        return
+
+    click.echo("\nHarness pointers:")
+    for result in results:
+        click.echo(f"  {result['harness']:<12} {result['action']:<10} {result['path']}")
+        if result["reason"]:
+            click.echo(f"    left alone: {result['reason']}")
+
+
 @cli.command(name="install")
 @click.argument("name")
-@click.option("--project", "tier", flag_value="project", default=True, help="Install into the project tier (default).")
-@click.option("--workspace", "tier", flag_value="workspace", help="Install into the workspace tier.")
+@_tier_options
 def install_cmd(name: str, tier: str) -> None:
     """Copy agent NAME from the user master down into a lower tier."""
     resolved = tiers.resolve(Path.cwd())
-    dst_root = resolved[tier]
-
-    if dst_root is None:
-        hint = "not inside a git repo" if tier == "project" else "no ancestor declares a .ai-agents workspace"
-        raise click.ClickException(f"no {tier} tier here ({hint})")
+    dst_root = _resolve_dst(tier)
 
     try:
         copied = install.copy_agent(name, resolved["user"], dst_root)
@@ -123,16 +176,103 @@ def install_cmd(name: str, tier: str) -> None:
     # be present from an earlier install whose harness had not been set up
     # yet, and regenerating an unchanged pointer costs nothing.
     results = install.generate_harness_adapters(name, dst_root, tier=tier)
+    _echo_pointer_results(results)
 
-    if not results:
-        click.echo("No supported harness detected here — no pointer files written.")
+
+@cli.command(name="update")
+@click.argument("name")
+@_tier_options
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Overwrite the installed copy even if it holds local edits.",
+)
+def update_cmd(name: str, tier: str, force: bool) -> None:
+    """Refresh agent NAME at a lower tier from the user master copy.
+
+    Picking up changes the master has made since install needs no flag —
+    that is the ordinary case. ``--force`` is only required when the
+    installed copy itself holds local edits (a changed or locally-added
+    file), because refreshing would destroy them. Run ``ai-agents diff``
+    first to see exactly what would be overwritten.
+    """
+    resolved = tiers.resolve(Path.cwd())
+    dst_root = _resolve_dst(tier)
+
+    try:
+        diff = lifecycle.update_agent(name, resolved["user"], dst_root, force=force)
+    except lifecycle.LocalDivergenceError as exc:
+        raise click.ClickException(f"{exc} (see `ai-agents diff {name}`)") from exc
+    except FileNotFoundError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(f"Updated {name} -> {dst_root / 'agents' / name}")
+    overwritten = lifecycle.local_evidence(diff)
+    if overwritten:
+        click.echo(f"  {len(overwritten)} file(s) of local edits were overwritten (--force)")
+    if diff["master_only"]:
+        click.echo(f"  picked up {len(diff['master_only'])} new file(s) from the master")
+
+    results = install.generate_harness_adapters(name, dst_root, tier=tier)
+    _echo_pointer_results(results)
+
+
+@cli.command(name="diff")
+@click.argument("name")
+@_tier_options
+def diff_cmd(name: str, tier: str) -> None:
+    """Report drift between an installed agent and the user master copy.
+
+    Purely read-only — nothing on disk changes, no matter how much drift
+    is reported. See ``ai-agents update`` to actually refresh the copy.
+    """
+    resolved = tiers.resolve(Path.cwd())
+    dst_root = _resolve_dst(tier)
+
+    try:
+        diff = lifecycle.diff_agent(name, resolved["user"], dst_root)
+    except FileNotFoundError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if not diff["diverged"]:
+        click.echo(f"{name} matches the user master copy — no drift.")
         return
 
-    click.echo("\nHarness pointers:")
-    for result in results:
-        click.echo(f"  {result['harness']:<12} {result['action']:<10} {result['path']}")
-        if result["reason"]:
-            click.echo(f"    left alone: {result['reason']}")
+    click.echo(f"{name} has diverged from the user master copy:\n")
+    if diff["changed"]:
+        click.echo("  changed (differs on both sides):")
+        for rel in diff["changed"]:
+            click.echo(f"    {rel}")
+    if diff["master_only"]:
+        click.echo("  missing locally (present in the master copy):")
+        for rel in diff["master_only"]:
+            click.echo(f"    {rel}")
+    if diff["local_only"]:
+        click.echo("  local-only (not in the master copy):")
+        for rel in diff["local_only"]:
+            click.echo(f"    {rel}")
+
+
+@cli.command(name="remove")
+@click.argument("name")
+@_tier_options
+def remove_cmd(name: str, tier: str) -> None:
+    """Delete agent NAME from a tier, along with its generated pointers.
+
+    A pointer a person hand-authored (no ``ai-agents``-generated marker) is
+    never deleted, even if it sits at the exact path a pointer would occupy
+    — see ``install.remove_harness_adapters``.
+    """
+    dst_root = _resolve_dst(tier)
+
+    try:
+        result = lifecycle.remove_agent(name, dst_root, tier=tier)
+    except FileNotFoundError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(f"Removed {dst_root / 'agents' / name}")
+    _echo_pointer_results(result["pointers"], empty_note="no pointer files to clean up")
 
 
 @cli.command()
