@@ -123,7 +123,16 @@ A ranked table, at most `shortlist_size` names, each row carrying:
 | `ATR%` | Average true range as a percent of price |
 | `DELIV` | Average delivery percentage; `*` marks a partial window |
 | `TURNOVER` | Median daily turnover, in crore |
+| `SIGNALS` | The setup the name is showing — `breakout`, `cross`, `pullback`, `extended`, or `-` for none |
 | `SCORE` | Weighted composite, for ordering only |
+
+`SIGNALS` describes; it does not select. Every name in the table already
+passed every filter, and a name showing no signal is holding its trend
+quietly rather than failing anything. `extended` in particular is a
+label and not an exclusion — whether a stock far above its average is
+the strongest name here or a bad entry depends on the trade being
+placed, which is the reader's call. The definitions are in
+`References/swing-criteria.md` § Signals.
 
 Above the table: the as-of session, the feed type, sessions loaded, the
 fetch timestamp in IST, the universe size, and every threshold applied.
@@ -155,8 +164,12 @@ asked.
 
 - **Candidates, not advice.** This Skill selects and ranks. It does not
   recommend, size, time, or execute.
-- **No fundamentals.** Nothing here reads earnings, valuation, debt or
-  ownership. It is a price, volume and delivery screen.
+- **No fundamentals in this Skill.** Nothing here reads earnings,
+  valuation, debt or ownership. It is a price, volume and delivery
+  screen, and it stays one — a shortlist from this Skill alone has had
+  no business-quality test applied to it. `Skills/fundamental-gate.md`
+  is where fundamentals enter, and `Workflows/morning-shortlist.md`
+  sequences the two.
 - **No intraday data.** Everything is end-of-day. There is no quote, no
   order book, and no live price anywhere in this path.
 - **No corporate-action adjustment**, and no sector or correlation
