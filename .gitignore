@@ -5,3 +5,10 @@ __pycache__/
 .venv/
 build/
 dist/
+
+# Claude Code plugin settings — machine-specific.
+# .claude-plugin/marketplace.json IS tracked: it is portable and is this
+# repo's own distribution surface. This file is not — it carries the
+# absolute path of one checkout, so committing it would point every other
+# clone at a directory that does not exist for them.
+.claude/settings.json
